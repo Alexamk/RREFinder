@@ -13,9 +13,15 @@ elif PYTHON_VERSION == 3:
 
 from subprocess import call
 
-# from lib import muscle, parse_fasta
-# from Genes import GeneCollection, CollectionCollection
-
+def parse_genbank(path,out={}):
+    if type(path) == list:
+        for item in path:
+            out = parse_genbank(item,out)
+    else:
+        all_seqs = open_genbank(path)
+        seq_dict = gbk_to_dict(all_seqs)
+        out.update(seq_dict)
+    return out
 
 def open_genbank(in_path):
     all_seqs = []
@@ -37,70 +43,190 @@ def gbk_to_dict(all_seqs):
                     if item in feature.qualifiers:
                         name += '_%s' %(feature.qualifiers[item][0])
                 if 'translation' in feature.qualifiers:
-                    seq = feature.qualifiers['translation']
+                    seq = feature.qualifiers['translation'][0]
                 else:
                     seq = feature.extract(seq).translate()
                 seq_dict[name] = seq
     return seq_dict
 
-def parse_fasta(path):
-    infile = open(path)
-    out = {}
-    name = False
-    for line in infile:
-        line = line.strip()
-        if ">" in line:
-            if name and name not in out:
-                out[name] = seq
-            name_start = line.find(">")
-            name = line[name_start+1:]
-            seq = ""
-        else:
-            seq += line
-    if name not in out:
-        out[name] = seq
+def parse_fasta(path,out={}):
+    if type(path) == list:
+        for item in list:
+            out = parse_fasta(item,out)
+    else:
+        infile = open(path)
+        name = False
+        for line in infile:
+            line = line.strip()
+            if ">" in line:
+                if name and name not in out:
+                    out[name] = seq
+                name_start = line.find(">")
+                name = line[name_start+1:]
+                seq = ""
+            else:
+                seq += line
+        if name not in out:
+            out[name] = seq
     return(out)
+    
+def make_diamond_database(protein_file,dbfile=False,threads=False,quiet=False):
+    if not dbfile:
+        name_clean = protein_file[:-6]
+        db_file = '%s.dmnd' %name_clean
+    commands = ['diamond','makedb','--in',protein_file,'-d',dbfile]
+    if threads:
+        commands += ['-p',str(threads)]
+    if quiet:
+        commands += ['--quiet']
+    print(' '.join(commands))
+    call(commands)
+    return(dbfile)
 
-def set_gene_objects(seq_dict,fasta_folder,results_folder,sens):
-    all_genes = []
-    for gene,seq in seq_dict.items():
-        fasta_file = os.path.join(fasta_folder,gene + '.fasta')
-        results_file = os.path.join(results_folder, '%s_%s.hhr' %(gene,sens))
-        gene_obj = Container()
-        gene_obj.setattrs(fasta_file=fasta_file,results_file=results_file,seq=seq,name=gene)
-        if sens:
-            exp_alignment_file = os.path.join(fasta_folder,'%s_expalign.a3m' %gene)
-            gene_obj.exp_alignment_file = exp_alignment_file
-        all_genes.append(gene_obj)
-    return all_genes
+def run_diamond(protein_file,database,outname,replacetabs=False,tmpdir='/dev/shm/',maxhits=100,sens=False,moresens=False,threads=False,evalue=False,quiet=False):
+    commands = ['diamond','blastp','--query',protein_file,'--db',database,\
+    '--max-target-seqs',str(maxhits),'--out',outname,'--tmpdir',tmpdir,'--outfmt',\
+    '6', 'qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen', 'qlen', 'slen', 'evalue', 'bitscore']
+    if threads:
+        commands += ['-p',str(threads)]
+    if evalue:
+        commands += ['--evalue',str(evalue)]
+    if sens:
+        commands.append('--sensitive')
+    elif moresens:
+        commands.append('--more-sensitive')
+    if quiet:
+        commands += ['--quiet']
 
-def write_fasta(all_genes):
-    for gene in all_genes:
-        with open(gene.fasta_file,'w') as handle:
-            handle.write('>%s\n%s' %(gene.name,gene.seq))
+    print(' '.join(commands))
+    call(commands)
+    
+def run_mcl(inf,outf,threads,I=1.5,quiet=False):
+    print("MCL START")
+    I = str(I)
+    cmd = ["mcl",inf,"-o",outf,"--abc","-I", I, '-te', str(threads)]
+    if quiet:
+        cmd += ['-show-log','n']
+    print(' '.join(cmd))
+    call(cmd)
+    
+def read_mcl(mcl_file,min_group_size=0):
+    all_groups = []
+    with open(mcl_file,'r') as f:
+        for l in f:
+            group = l.strip().split('\t')
+            if len(group) >= min_group_size:
+                all_groups.append(group)
+    return(all_groups)
+
+def parse_allvall(allvall_file,pident_cutoff):
+    score_dict = {}
+    with open(allvall_file) as handle:
+        for line in handle:
+            tabs = line.strip().split('\t')
+            qseqid,sseqid,pident = tabs[0:3]
+            pident = float(pident)
+            if pident < pident_cutoff or qseqid == sseqid:
+                continue
+            if qseqid not in score_dict:
+                score_dict[qseqid] = {}
+            score_dict[qseqid][sseqid] = pident
+    return score_dict
+
+def average_blast_scores(allvall):
+    # Average the pident from hits that gave hits as queries and as subjects
+    # Only keep one entry per pair
+    out = {}
+    for qseqid in allvall:
+        hits = allvall[qseqid]
+        for hit in hits:
+            if qseqid < hit:
+                pident = allvall[qseqid][hit]
+                try:
+                    pident_b = allvall[hit][qseqid]
+                    pident = float(pident + pident_b) / 2
+                except KeyError:
+                    pass
+                if qseqid not in out:
+                    out[qseqid] = {}
+                out[qseqid][hit] = pident
+    return out
+
+def write_ssn(score_dict,outfile):
+    with open(outfile,'w') as handle:
+        for qseqid in score_dict:
+            hits = score_dict[qseqid]
+            for hit in hits:
+                pident = score_dict[qseqid][hit]
+                handle.write('%s\t%s\t%.2f\n' %(qseqid,hit,pident))
+                
+def write_fasta(all_groups):
+    for group in all_groups:
+        with open(group.fasta_file,'w') as handle:
+            handle.write(group.fasta)
             
-def expand_alignment(all_genes,settings):
+def dict_to_fasta(d,f=False,mode='w'):
+    s = ''
+    for key in d:
+        seq = d[key]
+        s += '>%s\n%s\n' %(key,seq)
+    if f:
+        with open(f,mode) as handle:
+            handle.write(s)
+    return s
+            
+def expand_alignment(all_groups,settings):
     print('Expanding alignments')
     db_path = settings['uniclust_database_path']
-    for gene in all_genes:
-        a3m_hhblits(gene.fasta_file,gene.exp_alignment_file,db_path,settings.cores)
+    for group in all_groups:
+        if group.group:
+            infile = group.a3m_file
+        else:
+            infile = group.fasta_file
+        if not os.path.isfile(group.exp_alignment_file) or settings.overwrite_hhblits:
+            a3m_hhblits(infile,group.exp_alignment_file,db_path,settings.cores)
 
 def a3m_hhblits(inf,outf,db,threads=1):
     clean = inf.rpartition('.')[0]
     dumpfile = clean + '_expalign.hhr'
     commands = ['hhblits','-cpu',str(threads),'-d',db,'-i',inf,'-oa3m',outf,'-o',dumpfile]
     call(commands)
+    
+def all_muscle(all_groups):
+    print('Aligning groups')
+    for group in all_groups:
+        if group.group:
+            muscle(group.fasta_file,group.muscle_file)
+            reformat(group.muscle_file,group.a3m_file)
 
-def hhblits_all(all_genes,settings):
+def reformat(inf,outf):
+    commands = ['reformat.pl','fas','a3m',inf,outf]
+    print(' '.join(commands))
+    call(commands)
+
+def muscle(inf,outf,clw=False,quiet=True):
+    commands = ['muscle','-in',inf,'-out',outf]
+    if clw:
+        commands.append('-clw')
+    if quiet:
+        commands.append('-quiet')
+    print(' '.join(commands))
+    call(commands)
+    return outf
+
+def hhblits_all(all_groups,settings):
     print('Running hhblits')
     db_path = settings.rre_database_path
-    for gene in all_genes:
+    for group in all_groups:
         if settings.sensitivity == 'highsens':
-            infile = gene.exp_alignment_file
+            infile = group.exp_alignment_file
+        elif group.group:
+            infile = group.a3m_file
         else:
-            infile = gene.fasta_file
-        outfile = gene.results_file
-        hhblits(infile,outfile,db_path,settings.cores)
+            infile = group.fasta_file
+        outfile = group.results_file
+        if not os.path.isfile(outfile) or settings.overwrite_hhblits:
+            hhblits(infile,outfile,db_path,settings.cores)
 
 def hhblits(inf,outf,db,threads):
     commands = ['hhblits','-cpu',str(threads),'-d',db,'-i',inf,'-o',outf, '-v','0']
@@ -145,123 +271,152 @@ def read_hhr(f):
             colums = int(tabs[5])
             query_hmm = tabs[6]
             template_hmm = tabs[7]
-            results[name] = [prob,ev,pv,score,ss,colums,query_hmm,template_hmm]
+            results[name] = [prob,ev,pv,score,ss,colums,query_hmm,template_hmm]                    
 
-def write_results_summary(all_genes,outfile):
-    with open(outfile,'w') as handle:
-        header = 'Gene name','Hit name','Probability','E-value','P-value','Score','SS','Columns','Query HMM','Template HMM'
-        handle.write('\t'.join(header) + '\n')
-        for gene in all_genes:
-            if gene.RRE_hit:
-                for hit in gene.RRE_data:
-                    res = gene.RRE_data[hit]
-                    out = [gene.name,hit] + res
-                    outfile.write('\t'.join(out) + '\n')
-                    
-    
+def make_gene_objects(seq_dict,fasta_folder,results_folder,sens):
+    all_genes = []
+    for gene,seq in seq_dict.items():
+        fasta_file = os.path.join(fasta_folder,gene + '.fasta')
+        results_file = os.path.join(results_folder, '%s_%s.hhr' %(gene,sens))
+        fasta = '>%s\n%s\n' %(gene,seq)
+        gene_obj = Container()
+        gene_obj.setattrs(fasta_file=fasta_file,results_file=results_file,fasta=fasta,name=gene,group=False)
+        if sens == 'highsens':
+            exp_alignment_file = os.path.join(fasta_folder,'%s_expalign.a3m' %gene)
+            gene_obj.exp_alignment_file = exp_alignment_file
+        all_genes.append(gene_obj)
+    return all_genes
 
-def regroup_genes(genes,groups,operons,data_path,results_path,RRE_sens):
-    print('Regrouping genes with COG groups')
-    all_groups = {}
-    all_genes_grouped = set()
-    group_basename = 'group'
-    counter = 1
+def make_group_objects(groups,seq_dict,fasta_folder,results_folder,settings):
+    all_groups = []
+    group_nr = 1
+    genes_seen = set()
     for group in groups:
-        group_name = group_basename + '_' + str(counter)
-        genes_used = {}
+        group_name = '%s_group_%i' %(settings.project_name, group_nr)
+        seq_dict_group = dict([(gene,seq_dict[gene]) for gene in group])
+        fasta_group = dict_to_fasta(seq_dict_group)
+        fasta_file = os.path.join(fasta_folder,group_name + '.fasta')
+        results_file = os.path.join(results_folder, '%s_%s.hhr' %(group_name,settings.sensitivity))
+        muscle_file = os.path.join(fasta_folder,group_name + '_aligned.fasta')
+        a3m_file = os.path.join(fasta_folder,group_name + '.a3m')
+        group_obj = Container()
+        group_obj.setattrs(name=group_name,genes=group,fasta_file=fasta_file,results_file=results_file,\
+                              muscle_file=muscle_file,a3m_file=a3m_file,fasta=fasta_group,group=True)
+        if settings.sensitivity == 'highsens':
+            exp_alignment_file = os.path.join(fasta_folder,'%s_expalign.a3m' %group_name)
+            setattr(group_obj,'exp_alignment_file',exp_alignment_file)
+        all_groups.append(group_obj)
+        group_nr += 1
         for gene in group:
-            gene_obj = operons[gene]
-            if gene_obj and gene_obj.is_core:
-                genes_used[gene] = gene_obj
-        if len(genes_used) < 2:
-            # No added value if the gene can not be grouped
-            continue
-        fasta_file = os.path.join(data_path, group_name + '.fasta')
-        muscle_file = os.path.join(data_path, group_name + '_aligned.fas')
-        a3m_file = os.path.join(data_path, group_name + '.a3m')
-        results_file = os.path.join(results_path, group_name + '.hhr')
-        gene_coll = GeneCollection(genes_used,name=group_name,fasta_file=fasta_file,muscle_file=muscle_file,a3m_file=a3m_file,results_file=results_file,grouped=True)
-        if RRE_sens == 'high_sens':
-            exp_alignment_file = os.path.join(data_path, group_name + '_expalign.a3m')
-            gene_coll.exp_alignment_file = exp_alignment_file
-        all_groups[group_name] = gene_coll
-        counter += 1
-        for gene in genes_used:
-            all_genes_grouped.add(gene)
-    # Now add the remaining genes
-    print('Adding singleton genes')
-    for gene in genes:
-        if gene not in all_genes_grouped:
-            group_name = group_basename + '_' + str(counter)
-            fasta_file = os.path.join(data_path, group_name + '.fasta')
-            results_file = os.path.join(results_path, group_name + '.hhr')
-            gene_coll = GeneCollection(dict([(gene,operons[gene])]), fasta_file = fasta_file, results_file = results_file, grouped=False, name = group_name)
-            if RRE_sens == 'high_sens':
-                exp_alignment_file = os.path.join(data_path, group_name + '_expalign.a3m')
-                gene_coll.exp_alignment_file = exp_alignment_file
-            all_groups[group_name] = gene_coll
-            counter += 1
-    group_collection = CollectionCollection(all_groups)
-    return group_collection
-
-def read_groups(folder,basename):
-    files = [f for f in os.listdir(folder) if f.startswith(basename) and f.endswith('.fasta')]
-    groups_named = {}
-    for f in files:
-        d = parse_fasta(os.path.join(folder,f))
-        groupname = f.split('.')[0]
-        groups_named[groupname] = sorted(d.keys())
-    return groups_named
-
-
-
-def all_muscle(groups):
-    print('Aligning groups')
-    for group in groups:
-        if group.grouped:
-            muscle(group.fasta_file,group.muscle_file)
-            reformat(group.muscle_file,group.a3m_file)
-
-def reformat(inf,outf):
-    commands = ['reformat.pl','fas','a3m',inf,outf]
-    print(' '.join(commands))
-    call(commands)
+            genes_seen.add(gene)
+    return all_groups,genes_seen
+        
+    
+def write_results_summary(all_groups,outfile):
+    with open(outfile,'w') as handle:
+        header = 'Group name','Gene name','Hit name','Probability','E-value','P-value','Score','SS','Columns','Query HMM','Template HMM'
+        handle.write('\t'.join(header) + '\n')
+        for group in all_groups:
+            if group.RRE_hit:
+                if group.group:
+                    for gene in group.genes:
+                        for hit in group.RRE_data:
+                            res = group.RRE_data[hit]
+                            out = [group.name,gene,hit] + [str(i) for i in res]
+                            handle.write('\t'.join(out) + '\n')
+                else:
+                    for hit in group.RRE_data:
+                        res = group.RRE_data[hit]
+                        out = ['n/a',group.name,hit] + [str(i) for i in res]
+                        handle.write('\t'.join(out) + '\n')
 
 def main(settings):
+    if os.path.isfile(settings.infile):
+        # Singular file
+        infile = settings.infile
+        print('Reading in file %s' %infile)
+    elif os.path.isdir(settings.infile):
+        # Get all the relevant files
+        files = os.listdir(settings.infile)
+        if settings.intype == 'fasta':
+            exts = ['.fas','.fasta','.faa']
+        elif settings.intype == 'genbank':
+            exts = ['.gbk','.gbff']
+        infile = [os.path.join(settings.infile,f) for f in files if any([f.endswith(ext) for ext in exts]) and os.path.isfile(os.path.join(settings.infile,f))]
+        if len(infile) == 0:
+            print('No %s files found in folder %s' %(settings.intype,settings.infile))
+            exit()
+        else:
+            print('%i %s files found in folder %s' %(len(infile),settings.intype,settings.infile))
+    
+    # Temporary: small testset
+    # infile = infile[0:10]
+    
     if settings.intype == 'fasta':
-        seq_dict = parse_fasta(settings.infile)
+        seq_dict = parse_fasta(infile)
     elif settings.intype == 'genbank':
-        all_seqs = open_genbank(settings.infile)
-        seq_dict = gbk_to_dict(all_seqs)
+        seq_dict = parse_genbank(infile)
     if not hasattr(settings,'project_name'):
         settings.project_name = os.path.basename(settings.infile).rpartition('.')[0]
     data_folder = os.path.join('output',settings.project_name)
+    if os.path.isdir(data_folder):
+        print('Warning! Output folder with name %s already found - results may be overwritten' %(settings.project_name))
     fasta_folder = os.path.join(data_folder,'fastas')
     results_folder = os.path.join(data_folder,'results')
     for folder in data_folder,fasta_folder,results_folder:
         if not os.path.isdir(folder):
             os.mkdir(folder)
-    all_genes = set_gene_objects(seq_dict,fasta_folder,results_folder,settings.sensitivity)
-    # return all_genes
+    if settings.group_genes:
+        blast_folder = os.path.join(data_folder,'blast')
+        if not os.path.isdir(blast_folder):
+            os.mkdir(blast_folder)
+        
+        if os.path.isfile(settings.infile) == str and settings.intype == 'fasta':
+            # No need to make a new fasta file
+            fasta_all = settings.infile
+            pass
+        else:
+            fasta_all = os.path.join(blast_folder,'%s_sequences.fasta' %(settings.project_name))
+            _ = dict_to_fasta(seq_dict,fasta_all)
+        diamond_database = os.path.join(blast_folder,'%s_sequences.dmnd' %settings.project_name)
+        allvall_path = os.path.join(blast_folder,'%s_allvall.txt' %(settings.project_name))
+        ssn_file = os.path.join(blast_folder,'%s_pairs.ssn' %(settings.project_name))
+        mcl_file = os.path.join(blast_folder,'%s_groups.mcl' %(settings.project_name))
+        
+        make_diamond_database(fasta_all,diamond_database,threads=settings.cores,quiet=True)
+        run_diamond(fasta_all,diamond_database,allvall_path,threads=settings.cores,quiet=True)
+        allvall_dict = parse_allvall(allvall_path,settings.gene_pid_cutoff)
+        allvall_filtered = average_blast_scores(allvall_dict)
+        write_ssn(allvall_filtered,ssn_file)
+        run_mcl(ssn_file,mcl_file,settings.cores,quiet=True)
+        groups = read_mcl(mcl_file)
+        all_groups,genes_seen = make_group_objects(groups,seq_dict,fasta_folder,results_folder,settings)
+        remaining_seq_dict = dict([(gene,seq_dict[gene]) for gene in seq_dict if gene not in genes_seen])
+        remaining_groups = make_gene_objects(remaining_seq_dict,fasta_folder,results_folder,settings.sensitivity)
+        all_groups += remaining_groups
+    else:
+        all_groups = make_gene_objects(seq_dict,fasta_folder,results_folder,settings.sensitivity)
     # Get the names of the targets that are considered RRE hits
     RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
     # Write out fasta files for each gene
-    write_fasta(all_genes)
+    write_fasta(all_groups)
+    # For gene groups, align and write a3m files
+    all_muscle(all_groups)
     # If the alignment needs to be expanded, do so here
     if settings.sensitivity == 'highsens':
         expand_alignment(all_genes,settings)
     # Run hhblits
-    hhblits_all(all_genes,settings)
+    hhblits_all(all_groups,settings)
     # Parse the results
-    parse_all_RREs(all_genes,RRE_targets,settings)
-    write_results_summary(all_genes,settings.outfile)
-    
-
+    parse_all_RREs(all_groups,RRE_targets,settings)
+    write_results_summary(all_groups,settings.outfile)
 
 class Container():
-    # Container for provided settings
+    # Container for provided settings and to store info on genes
     def __init__(self):
         pass
+    def __repr__(self):
+        return('Container object')
     def setattrs(self,**kwargs):
         for key,value in kwargs.items():
             setattr(self,key,value)
@@ -295,7 +450,8 @@ def parse_arguments():
     parser.add_argument('-o','--outfile',help='File where the results will be written to')
     parser.add_argument('-m','--min_prob',help='The minimum probability for a hit to be considered significant (reads from config file if none is given)')
     parser.add_argument('-s','--sensitivity',help='The sensitivity (highsens or lowsens); Alignments are first expanded in the highsens mode, which requires the uniclust database')
-    
+    parser.add_argument('--group_genes',help='Group found genes first with Diamond/mcl', default=False,action='store_true')
+    parser.add_argument('-c','--cores',help='Number of cores to use')
     
     args = parser.parse_args()
     for key,value in args.__dict__.items():
