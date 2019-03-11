@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import time
 
 from Bio import SeqIO
 
@@ -12,6 +13,9 @@ elif PYTHON_VERSION == 3:
     import configparser
 
 from subprocess import call
+
+from multiprocessing import Process, Queue
+
 
 def parse_genbank(path,out={}):
     if type(path) == list:
@@ -177,7 +181,7 @@ def dict_to_fasta(d,f=False,mode='w'):
             
 def expand_alignment(all_groups,settings):
     print('Expanding alignments')
-    db_path = settings['uniclust_database_path']
+    db_path = settings.expand_database_path
     for group in all_groups:
         if group.group:
             infile = group.a3m_file
@@ -189,15 +193,17 @@ def expand_alignment(all_groups,settings):
 def a3m_hhblits(inf,outf,db,threads=1):
     clean = inf.rpartition('.')[0]
     dumpfile = clean + '_expalign.hhr'
-    commands = ['hhblits','-cpu',str(threads),'-d',db,'-i',inf,'-oa3m',outf,'-o',dumpfile]
+    commands = ['hhblits','-cpu',str(threads),'-d',db,'-i',inf,'-oa3m',outf,'-o',dumpfile,'-v','0','-n','3']
     call(commands)
     
 def all_muscle(all_groups):
     print('Aligning groups')
     for group in all_groups:
         if group.group:
-            muscle(group.fasta_file,group.muscle_file)
-            reformat(group.muscle_file,group.a3m_file)
+            if not os.path.isfile(group.muscle_file):
+                muscle(group.fasta_file,group.muscle_file)
+            if not os.path.isfile(group.a3m_file):
+                reformat(group.muscle_file,group.a3m_file)
 
 def reformat(inf,outf):
     commands = ['reformat.pl','fas','a3m',inf,outf]
@@ -214,11 +220,11 @@ def muscle(inf,outf,clw=False,quiet=True):
     call(commands)
     return outf
 
-def hhblits_all(all_groups,settings):
-    print('Running hhblits')
+def hhsearch_all(all_groups,settings):
+    print('Running hhsearch')
     db_path = settings.rre_database_path
     for group in all_groups:
-        if settings.sensitivity == 'highsens':
+        if settings.expand_alignment:
             infile = group.exp_alignment_file
         elif group.group:
             infile = group.a3m_file
@@ -228,8 +234,8 @@ def hhblits_all(all_groups,settings):
         if not os.path.isfile(outfile) or settings.overwrite_hhblits:
             hhblits(infile,outfile,db_path,settings.cores)
 
-def hhblits(inf,outf,db,threads):
-    commands = ['hhblits','-cpu',str(threads),'-d',db,'-i',inf,'-o',outf, '-v','0']
+def hhsearch(inf,outf,db,threads):
+    commands = ['hhsearch','-cpu',str(threads),'-d',db,'-i',inf,'-o',outf, '-v','0']
     call(commands)
 
 def parse_all_RREs(genes,RRE_targets,settings):
@@ -271,9 +277,11 @@ def read_hhr(f):
             colums = int(tabs[5])
             query_hmm = tabs[6]
             template_hmm = tabs[7]
-            results[name] = [prob,ev,pv,score,ss,colums,query_hmm,template_hmm]                    
+            if name not in results:
+                results[name] = [prob,ev,pv,score,ss,colums,query_hmm,template_hmm]  
+    return results
 
-def make_gene_objects(seq_dict,fasta_folder,results_folder,sens):
+def make_gene_objects(seq_dict,fasta_folder,results_folder,expanded):
     all_genes = []
     for gene,seq in seq_dict.items():
         fasta_file = os.path.join(fasta_folder,gene + '.fasta')
@@ -281,7 +289,7 @@ def make_gene_objects(seq_dict,fasta_folder,results_folder,sens):
         fasta = '>%s\n%s\n' %(gene,seq)
         gene_obj = Container()
         gene_obj.setattrs(fasta_file=fasta_file,results_file=results_file,fasta=fasta,name=gene,group=False)
-        if sens == 'highsens':
+        if expanded:
             exp_alignment_file = os.path.join(fasta_folder,'%s_expalign.a3m' %gene)
             gene_obj.exp_alignment_file = exp_alignment_file
         all_genes.append(gene_obj)
@@ -296,13 +304,14 @@ def make_group_objects(groups,seq_dict,fasta_folder,results_folder,settings):
         seq_dict_group = dict([(gene,seq_dict[gene]) for gene in group])
         fasta_group = dict_to_fasta(seq_dict_group)
         fasta_file = os.path.join(fasta_folder,group_name + '.fasta')
-        results_file = os.path.join(results_folder, '%s_%s.hhr' %(group_name,settings.sensitivity))
+        text = '_expanded' if settings.expand_alignment else ''
+        results_file = os.path.join(results_folder, '%s%s.hhr' %(group_name,text))
         muscle_file = os.path.join(fasta_folder,group_name + '_aligned.fasta')
         a3m_file = os.path.join(fasta_folder,group_name + '.a3m')
         group_obj = Container()
         group_obj.setattrs(name=group_name,genes=group,fasta_file=fasta_file,results_file=results_file,\
                               muscle_file=muscle_file,a3m_file=a3m_file,fasta=fasta_group,group=True)
-        if settings.sensitivity == 'highsens':
+        if settings.expand_alignment:
             exp_alignment_file = os.path.join(fasta_folder,'%s_expalign.a3m' %group_name)
             setattr(group_obj,'exp_alignment_file',exp_alignment_file)
         all_groups.append(group_obj)
@@ -329,6 +338,103 @@ def write_results_summary(all_groups,outfile):
                         res = group.RRE_data[hit]
                         out = ['n/a',group.name,hit] + [str(i) for i in res]
                         handle.write('\t'.join(out) + '\n')
+
+def pipeline_operator(all_groups,settings):
+    print('Splitting work over %i processes' %settings.cores)
+    work_queue = Queue()
+    results_queue = Queue()
+    
+    def put_jobs(groups,queue,nr):
+        for group in groups[0:nr]:
+            queue.put(group)
+        return groups[nr:]
+    
+    all_groups = put_jobs(all_groups,work_queue,20*settings.cores)
+    print('Creating workers')
+    workers = []
+    data_worker = [settings,work_queue,results_queue]
+    for i in range(settings.cores):
+        worker = Process(target=pipeline_worker,args=data_worker)
+        workers.append(worker)
+    results = []
+    for worker in workers:
+        worker.start()
+    
+    while any([w.is_alive() for w in workers]):
+        print('%i workers still alive' %(len([w.is_alive() for w in workers])))
+        print('Work queue: %i; all_groups: %i' %(work_queue.qsize(),len(all_groups)))
+        while not results_queue.empty():
+            res = results_queue.get()
+            results.append(res)
+        if work_queue.qsize() < settings.cores:
+            if len(all_groups) > 0:
+                all_groups = put_jobs(all_groups,work_queue,5*settings.cores)
+            else:
+                for _ in range(settings.cores()):
+                    work_queue.put(False)
+        time.sleep(10)
+    print('Final run')
+    while not results_queue.empty():
+        res = results_queue.get()
+    print('Joining workers')
+    for worker in workers:
+        worker.join()
+    return results
+    
+def pipeline_worker(settings,queue,done_queue):
+    print('Starting process id: %s'  %os.getpid())
+    RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
+    expand_db_path = settings.expand_database_path
+    db_path = settings.rre_database_path
+    while True:
+        try:
+            group = queue.get()
+        except:
+            time.sleep(10)
+            continue
+        if group == False:
+            break
+        print('Process id %s starting work on group %s' %(os.getpid(),group.name))
+        # Write out fasta files for each gene
+        if not os.path.isfile(group.fasta_file):
+            with open(group.fasta_file,'w') as handle:
+                handle.write(group.fasta)
+        # For gene groups, align and write a3m files
+        if group.group:
+            if not os.path.isfile(group.muscle_file):
+                muscle(group.fasta_file,group.muscle_file)
+            if not os.path.isfile(group.a3m_file):
+                reformat(group.muscle_file,group.a3m_file)
+        # If the alignment needs to be expanded, do so here
+        if settings.expand_alignment:
+            if group.group:
+                infile = group.a3m_file
+            else:
+                infile = group.fasta_file
+            if not os.path.isfile(group.exp_alignment_file) or settings.overwrite_hhblits:
+                a3m_hhblits(infile,group.exp_alignment_file,expand_db_path,1)
+        # Run hhblits
+        if settings.expand_alignment:
+            infile = group.exp_alignment_file
+        elif group.group:
+            infile = group.a3m_file
+        else:
+            infile = group.fasta_file
+        outfile = group.results_file
+        if not os.path.isfile(outfile) or settings.overwrite_hhblits:
+            hhblits(infile,outfile,db_path,settings.cores)
+        # Parse the results
+        results = read_hhr(group.results_file)
+        RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=settings.min_prob)
+        if len(RRE_hits) > 0:
+            group.RRE_data = RRE_hits
+            group.RRE_hit = True
+        else:
+            group.RRE_hit = False
+        # print('%s %s' %(group.name,group.RRE_hit))
+        done_queue.put(group)
+    print('Process %s exiting' %os.getpid())
+
 
 def main(settings):
     if os.path.isfile(settings.infile):
@@ -383,40 +489,55 @@ def main(settings):
         ssn_file = os.path.join(blast_folder,'%s_pairs.ssn' %(settings.project_name))
         mcl_file = os.path.join(blast_folder,'%s_groups.mcl' %(settings.project_name))
         
-        make_diamond_database(fasta_all,diamond_database,threads=settings.cores,quiet=True)
-        run_diamond(fasta_all,diamond_database,allvall_path,threads=settings.cores,quiet=True)
-        allvall_dict = parse_allvall(allvall_path,settings.gene_pid_cutoff)
-        allvall_filtered = average_blast_scores(allvall_dict)
-        write_ssn(allvall_filtered,ssn_file)
-        run_mcl(ssn_file,mcl_file,settings.cores,quiet=True)
+        if not os.path.isfile(diamond_database):
+            make_diamond_database(fasta_all,diamond_database,threads=settings.cores,quiet=True)
+        if not os.path.isfile(allvall_path):
+            run_diamond(fasta_all,diamond_database,allvall_path,threads=settings.cores,quiet=True)
+        if not os.path.isfile(ssn_file):
+            allvall_dict = parse_allvall(allvall_path,settings.gene_pid_cutoff)
+            allvall_filtered = average_blast_scores(allvall_dict)
+            write_ssn(allvall_filtered,ssn_file)
+        if not os.path.isfile(mcl_file):
+            run_mcl(ssn_file,mcl_file,settings.cores,quiet=True)
         groups = read_mcl(mcl_file)
         all_groups,genes_seen = make_group_objects(groups,seq_dict,fasta_folder,results_folder,settings)
         remaining_seq_dict = dict([(gene,seq_dict[gene]) for gene in seq_dict if gene not in genes_seen])
-        remaining_groups = make_gene_objects(remaining_seq_dict,fasta_folder,results_folder,settings.sensitivity)
+        remaining_groups = make_gene_objects(remaining_seq_dict,fasta_folder,results_folder,settings.expand_alignment)
         all_groups += remaining_groups
     else:
-        all_groups = make_gene_objects(seq_dict,fasta_folder,results_folder,settings.sensitivity)
-    # Get the names of the targets that are considered RRE hits
-    RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
-    # Write out fasta files for each gene
-    write_fasta(all_groups)
-    # For gene groups, align and write a3m files
-    all_muscle(all_groups)
-    # If the alignment needs to be expanded, do so here
-    if settings.sensitivity == 'highsens':
-        expand_alignment(all_genes,settings)
-    # Run hhblits
-    hhblits_all(all_groups,settings)
-    # Parse the results
-    parse_all_RREs(all_groups,RRE_targets,settings)
+        all_groups = make_gene_objects(seq_dict,fasta_folder,results_folder,settings.expand_alignment)
+    print('Continuing with %i queries, %i of which are groups of genes' %(len(all_groups), len([g for g in all_groups if g.group])))
+    
+    if int(settings.cores) < len(all_groups):
+        all_groups = pipeline_operator(all_groups,settings)
+    else:
+        # Get the names of the targets that are considered RRE hits
+        print('Doing this')
+        RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
+        # Write out fasta files for each gene
+        write_fasta(all_groups)
+        # For gene groups, align and write a3m files
+        # TODO: Multiprocess muscle
+        all_muscle(all_groups)
+        # If the alignment needs to be expanded, do so here
+        if settings.expand_alignment:
+            expand_alignment(all_groups,settings)
+        # Run hhsearch
+        hhblits_all(all_groups,settings)
+        # Parse the results
+        parse_all_RREs(all_groups,RRE_targets,settings)
     write_results_summary(all_groups,settings.outfile)
+    return all_groups
 
 class Container():
     # Container for provided settings and to store info on genes
     def __init__(self):
         pass
     def __repr__(self):
-        return('Container object')
+        if hasattr(self,'name'):
+            return('Container object (%s)' %self.name)
+        else:
+            return('Container object')
     def setattrs(self,**kwargs):
         for key,value in kwargs.items():
             setattr(self,key,value)
@@ -449,9 +570,9 @@ def parse_arguments():
     parser.add_argument('-t','--intype',help='Type of input file to be analyzed (fasta or genbank; default genbank',default='genbank')
     parser.add_argument('-o','--outfile',help='File where the results will be written to')
     parser.add_argument('-m','--min_prob',help='The minimum probability for a hit to be considered significant (reads from config file if none is given)')
-    parser.add_argument('-s','--sensitivity',help='The sensitivity (highsens or lowsens); Alignments are first expanded in the highsens mode, which requires the uniclust database')
+    parser.add_argument('--expand_alignment',help='Indicate whether or not the queries should be expanded',default=False,action='store_true')
     parser.add_argument('--group_genes',help='Group found genes first with Diamond/mcl', default=False,action='store_true')
-    parser.add_argument('-c','--cores',help='Number of cores to use')
+    parser.add_argument('-c','--cores',help='Number of cores to use',type=int)
     
     args = parser.parse_args()
     for key,value in args.__dict__.items():
@@ -464,6 +585,10 @@ def parse_arguments():
 
 if __name__ == '__main__':
     settings = parse_arguments()
+    exit()
+    if settings.expand_alignment and not settings.expand_database_path:
+        print('Expanding the alignment requires a database. Please set the path in the config file')
+        exit()
     res = main(settings)
     
 
