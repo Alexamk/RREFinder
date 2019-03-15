@@ -53,9 +53,12 @@ def gbk_to_dict(all_seqs):
                 seq_dict[name] = seq
     return seq_dict
 
-def parse_fasta(path,out={}):
+def parse_fasta(path,out=None):
+    if out == None:
+        out = {}
     if type(path) == list:
-        for item in list:
+        print('Parsing multiple')
+        for item in path:
             out = parse_fasta(item,out)
     else:
         infile = open(path)
@@ -370,7 +373,7 @@ def pipeline_operator(all_groups,settings):
             if len(all_groups) > 0:
                 all_groups = put_jobs(all_groups,work_queue,5*settings.cores)
             else:
-                for _ in range(settings.cores()):
+                for _ in range(settings.cores):
                     work_queue.put(False)
         time.sleep(10)
     print('Final run')
