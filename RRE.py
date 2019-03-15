@@ -197,6 +197,7 @@ def a3m_hhblits(inf,outf,db,threads=1):
     clean = inf.rpartition('.')[0]
     dumpfile = clean + '_expalign.hhr'
     commands = ['hhblits','-cpu',str(threads),'-d',db,'-i',inf,'-oa3m',outf,'-o',dumpfile,'-v','0','-n','3']
+    print(' '.join(commands))
     call(commands)
     
 def all_muscle(all_groups):
@@ -288,7 +289,7 @@ def make_gene_objects(seq_dict,fasta_folder,results_folder,expanded):
     all_genes = []
     for gene,seq in seq_dict.items():
         fasta_file = os.path.join(fasta_folder,gene + '.fasta')
-        results_file = os.path.join(results_folder, '%s_%s.hhr' %(gene,sens))
+        results_file = os.path.join(results_folder, '%s.hhr' %(gene))
         fasta = '>%s\n%s\n' %(gene,seq)
         gene_obj = Container()
         gene_obj.setattrs(fasta_file=fasta_file,results_file=results_file,fasta=fasta,name=gene,group=False)
@@ -352,7 +353,7 @@ def pipeline_operator(all_groups,settings):
             queue.put(group)
         return groups[nr:]
     
-    all_groups = put_jobs(all_groups,work_queue,20*settings.cores)
+    all_groups = put_jobs(all_groups,work_queue,5*settings.cores)
     print('Creating workers')
     workers = []
     data_worker = [settings,work_queue,results_queue]
@@ -367,6 +368,7 @@ def pipeline_operator(all_groups,settings):
         print('%i workers still alive' %(len([w.is_alive() for w in workers])))
         print('Work queue: %i; all_groups: %i' %(work_queue.qsize(),len(all_groups)))
         while not results_queue.empty():
+            print('Found %i results in queue' %results_queue.qsize())
             res = results_queue.get()
             results.append(res)
         if work_queue.qsize() < settings.cores:
@@ -376,7 +378,6 @@ def pipeline_operator(all_groups,settings):
                 for _ in range(settings.cores):
                     work_queue.put(False)
         time.sleep(10)
-    print('Final run')
     while not results_queue.empty():
         res = results_queue.get()
     print('Joining workers')
@@ -410,6 +411,7 @@ def pipeline_worker(settings,queue,done_queue):
                 reformat(group.muscle_file,group.a3m_file)
         # If the alignment needs to be expanded, do so here
         if settings.expand_alignment:
+            print('Process id %s expanding alignment' %(os.getpid()))
             if group.group:
                 infile = group.a3m_file
             else:
@@ -425,7 +427,8 @@ def pipeline_worker(settings,queue,done_queue):
             infile = group.fasta_file
         outfile = group.results_file
         if not os.path.isfile(outfile) or settings.overwrite_hhblits:
-            hhblits(infile,outfile,db_path,settings.cores)
+            print('Process id %s running hhsearch' %(os.getpid()))
+            hhsearch(infile,outfile,db_path,settings.cores)
         # Parse the results
         results = read_hhr(group.results_file)
         RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=settings.min_prob)
@@ -435,6 +438,7 @@ def pipeline_worker(settings,queue,done_queue):
         else:
             group.RRE_hit = False
         # print('%s %s' %(group.name,group.RRE_hit))
+        print('Process id %s depositing results' %os.getpid())
         done_queue.put(group)
     print('Process %s exiting' %os.getpid())
 
@@ -529,6 +533,7 @@ def main(settings):
         hhblits_all(all_groups,settings)
         # Parse the results
         parse_all_RREs(all_groups,RRE_targets,settings)
+    outfile = os.path.join(data_folder,'%s_results.txt' %settings.project_name)
     write_results_summary(all_groups,settings.outfile)
     return all_groups
 
@@ -568,10 +573,9 @@ def parse_arguments():
     
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-p','--project_name',help='A name for your project (Uses filename if none is provided')
+    parser.add_argument('project_name',metavar='PROJECT NAME',help='A name for your project (Uses filename if none is provided')
     parser.add_argument('-i','--infile',help='File or folder to be analyzed')
     parser.add_argument('-t','--intype',help='Type of input file to be analyzed (fasta or genbank; default genbank',default='genbank')
-    parser.add_argument('-o','--outfile',help='File where the results will be written to')
     parser.add_argument('-m','--min_prob',help='The minimum probability for a hit to be considered significant (reads from config file if none is given)')
     parser.add_argument('--expand_alignment',help='Indicate whether or not the queries should be expanded',default=False,action='store_true')
     parser.add_argument('--group_genes',help='Group found genes first with Diamond/mcl', default=False,action='store_true')
@@ -588,12 +592,13 @@ def parse_arguments():
 
 if __name__ == '__main__':
     settings = parse_arguments()
-    exit()
     if settings.expand_alignment and not settings.expand_database_path:
         print('Expanding the alignment requires a database. Please set the path in the config file')
         exit()
+    t0 = time.time()
     res = main(settings)
-    
+    t1 = time.time()
+    print('Finished. Total time: %.2f seconds' %(t1-t0))
 
 
 
