@@ -471,6 +471,8 @@ def main(settings):
         seq_dict = parse_genbank(infile)
     if not hasattr(settings,'project_name'):
         settings.project_name = os.path.basename(settings.infile).rpartition('.')[0]
+    if not os.path.isdir('output'):
+        os.mkdir('output')
     data_folder = os.path.join('output',settings.project_name)
     if os.path.isdir(data_folder):
         print('Warning! Output folder with name %s already found - results may be overwritten' %(settings.project_name))
