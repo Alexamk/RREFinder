@@ -236,7 +236,7 @@ def hhsearch_all(all_groups,settings):
             infile = group.fasta_file
         outfile = group.results_file
         if not os.path.isfile(outfile) or settings.overwrite_hhblits:
-            hhblits(infile,outfile,db_path,settings.cores)
+            hhsearch(infile,outfile,db_path,settings.cores)
 
 def hhsearch(inf,outf,db,threads):
     commands = ['hhsearch','-cpu',str(threads),'-d',db,'-i',inf,'-o',outf, '-v','0']
@@ -377,9 +377,10 @@ def pipeline_operator(all_groups,settings):
             else:
                 for _ in range(settings.cores):
                     work_queue.put(False)
-        time.sleep(10)
+        time.sleep(1)
     while not results_queue.empty():
         res = results_queue.get()
+        results.append(res)
     print('Joining workers')
     for worker in workers:
         worker.join()
@@ -428,7 +429,7 @@ def pipeline_worker(settings,queue,done_queue):
         outfile = group.results_file
         if not os.path.isfile(outfile) or settings.overwrite_hhblits:
             print('Process id %s running hhsearch' %(os.getpid()))
-            hhsearch(infile,outfile,db_path,settings.cores)
+            hhsearch(infile,outfile,db_path,1)
         # Parse the results
         results = read_hhr(group.results_file)
         RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=settings.min_prob)
@@ -521,7 +522,6 @@ def main(settings):
         all_groups = pipeline_operator(all_groups,settings)
     else:
         # Get the names of the targets that are considered RRE hits
-        print('Doing this')
         RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
         # Write out fasta files for each gene
         write_fasta(all_groups)
@@ -532,11 +532,11 @@ def main(settings):
         if settings.expand_alignment:
             expand_alignment(all_groups,settings)
         # Run hhsearch
-        hhblits_all(all_groups,settings)
+        hhsearch_all(all_groups,settings)
         # Parse the results
         parse_all_RREs(all_groups,RRE_targets,settings)
     outfile = os.path.join(data_folder,'%s_results.txt' %settings.project_name)
-    write_results_summary(all_groups,settings.outfile)
+    write_results_summary(all_groups,outfile)
     return all_groups
 
 class Container():
