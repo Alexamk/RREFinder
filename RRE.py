@@ -224,6 +224,31 @@ def muscle(inf,outf,clw=False,quiet=True):
     call(commands)
     return outf
 
+def add_ss(group,resubmit=False,remove=False):
+    # Only if the alignment was also expanded
+    if resubmit:
+        infile = group.RRE_expalign_file
+    else:
+        infile = group.exp_alignment_file
+    newfile = group.exp_alignment_file[:-4] + '_ss.a3m'
+    cmds = ['addss.pl',infile,newfile,'-a3m']
+    print(' '.join(cmds))
+    call(cmds)
+    if resubmit:
+        group.RRE_expalign_file = newfile
+        if remove:
+            os.remove(infile)
+    else:
+        group.exp_alignment_file = newfile
+        if remove:
+            os.remove(infile)
+
+def add_all_ss(groups,resubmit=False):
+    print('Adding secondary structure')
+    for group in groups:
+        add_ss(group,resubmit=resubmit)
+        
+
 def hhsearch_all(all_groups,settings):
     print('Running hhsearch')
     db_path = settings.rre_database_path
@@ -241,16 +266,6 @@ def hhsearch_all(all_groups,settings):
 def hhsearch(inf,outf,db,threads):
     commands = ['hhsearch','-cpu',str(threads),'-d',db,'-i',inf,'-o',outf, '-v','0']
     call(commands)
-
-def parse_all_RREs(genes,RRE_targets,settings):
-    for gene in genes:
-        results = read_hhr(gene.results_file)
-        RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=settings.min_prob)
-        if len(RRE_hits) > 0:
-            gene.RRE_data = RRE_hits
-            gene.RRE_hit = True
-        else:
-            gene.RRE_hit = False
 
 def find_RRE_hits(results,targets,min_prob = 50.0):
     sign_hits = {}
@@ -288,6 +303,7 @@ def read_hhr(f):
 def make_gene_objects(seq_dict,fasta_folder,results_folder,expanded):
     all_genes = []
     for gene,seq in seq_dict.items():
+        gene = gene.replace(' ','_')
         fasta_file = os.path.join(fasta_folder,gene + '.fasta')
         results_file = os.path.join(results_folder, '%s.hhr' %(gene))
         fasta = '>%s\n%s\n' %(gene,seq)
@@ -324,22 +340,128 @@ def make_group_objects(groups,seq_dict,fasta_folder,results_folder,settings):
             genes_seen.add(gene)
     return all_groups,genes_seen
         
+def extract_RRE(group,settings):
+    # print(group.name)
+    min_start = 10e6
+    max_end = 0
+    for hit in group.RRE_data:
+        prob,ev,pv,score,ss,colums,query_hmm,template_hmm = group.RRE_data[hit]
+        # print(prob,ev,pv,score,ss,colums,query_hmm,template_hmm)
+        if prob < settings.resubmit_initial_prob:
+            continue
+        start,end = query_hmm.split('-')
+        # print(start,end)
+        start = int(start)
+        end = int(end)
+        if start < min_start:
+            # print('Replacing start')
+            min_start = start
+        if end > max_end:
+            # print('Replacing end')
+            max_end = end
+    fasta_out = {}
     
-def write_results_summary(all_groups,outfile):
+    if group.group:
+        fasta = parse_fasta(group.muscle_file)
+    else:
+        fasta = parse_fasta(group.fasta_file)
+    
+    for name,seq in fasta.items():
+        # print('Determining region')
+        # print(min_start,max_end)
+        # If multiple genes are part of this group, extract each RRE and make a new alignment from them
+        newname = '%s_RRE' %(group.name)
+        RRE_part = seq[max(0,min_start-settings.extra_left):max_end+settings.extra_right]
+        # print('Extracting from %i to %i' %(max(0,min_start-settings.extra_left),max_end+settings.extra_right))
+        fasta_out[newname] = RRE_part
+    dict_to_fasta(fasta_out,group.RRE_fasta_file)
+    
+def resubmit_group(group,RRE_targets,settings):
+    # Set extra paths for the files
+    RRE_fasta_file = os.path.join(settings.fasta_folder,group.name+'_RRE.fasta')
+    RRE_results_file = os.path.join(settings.results_folder,group.name+'_RRE.hhr')
+    RRE_expalign_file = os.path.join(settings.fasta_folder,group.name+'_RRE_expalign.a3m')
+    group.setattrs(RRE_fasta_file=RRE_fasta_file,RRE_results_file=RRE_results_file,RRE_expalign_file=RRE_expalign_file)
+    if group.group:
+        RRE_alignment_file = os.path.join(fasta_folder,group.name+'_RRE.a3m')
+        group.setattrs(RRE_alignment_file=RRE_alignment_file)
+    # Now extract the RRE
+    extract_RRE(group,settings)
+    # Convert the alignment to .a3m if necessary and select the relevant infile for MSA expansion
+    if group.group:
+        if not os.path.isfile(group.RRE_alignment_file):
+            reformat(group.RRE_fasta_file,group.RRE_alignment_file)
+        infile = group.RRE_alignment_file
+    else:
+        infile = group.RRE_fasta_file
+    # Expand the alignment
+    db_path = settings.resubmit_database
+    if not os.path.isfile(RRE_expalign_file):
+        a3m_hhblits(infile,RRE_expalign_file,db_path,settings.cores)
+    if settings.addss:
+        add_ss(group,resubmit=True)
+    # Run HHsearch
+    db_path = settings.rre_database_path
+    if not os.path.isfile(RRE_results_file):
+        hhsearch(RRE_expalign_file,RRE_results_file,db_path,settings.cores)
+    # Parse the results
+    parse_res(group,RRE_targets,settings,resubmit=True)
+    
+def parse_res(group,RRE_targets,settings,resubmit=False):
+    if resubmit:
+        results = read_hhr(group.RRE_results_file)
+        RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=settings.min_prob)
+        if len(RRE_hits) > 0:
+            group.RRE_resubmit_hit = True
+            group.RRE_resubmit_data = RRE_hits
+        else:
+            group.RRE_resubmit_hit = False
+    else:
+        if settings.resubmit:
+            prob = settings.resubmit_initial_prob
+        else:
+            prob = settings.min_prob
+        results = read_hhr(group.results_file)
+        RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=prob)
+        if len(RRE_hits) > 0:
+            group.RRE_data = RRE_hits
+            group.RRE_hit = True
+        else:
+            group.RRE_hit = False
+    
+def parse_all_RREs(groups,RRE_targets,settings,resubmit=False):
+    print('Parsing results')
+    for group in groups:
+        parse_res(group,RRE_targets,settings,resubmit)
+
+
+def resubmit_all(groups,RRE_targets,settings):
+    print('Resubmitting %i found RREs' %(len([i for i in groups if i.RRE_hit])))
+    for group in groups:
+        if group.RRE_hit:
+            resubmit_group(group,RRE_targets,settings)
+    
+def write_results_summary(all_groups,outfile,resubmit=False):
     with open(outfile,'w') as handle:
         header = 'Group name','Gene name','Hit name','Probability','E-value','P-value','Score','SS','Columns','Query HMM','Template HMM'
         handle.write('\t'.join(header) + '\n')
+        if resubmit:
+            hit_attr = 'RRE_resubmit_hit'
+            data_attr = 'RRE_resubmit_data'
+        else:
+            hit_attr = 'RRE_hit'
+            data_attr = 'RRE_data'
         for group in all_groups:
-            if group.RRE_hit:
+            if hasattr(group,hit_attr) and getattr(group,hit_attr):
                 if group.group:
                     for gene in group.genes:
-                        for hit in group.RRE_data:
-                            res = group.RRE_data[hit]
+                        for hit in getattr(group,data_attr):
+                            res = getattr(group,data_attr)[hit]
                             out = [group.name,gene,hit] + [str(i) for i in res]
                             handle.write('\t'.join(out) + '\n')
                 else:
-                    for hit in group.RRE_data:
-                        res = group.RRE_data[hit]
+                    for hit in getattr(group,data_attr):
+                        res = getattr(group,data_attr)[hit]
                         out = ['n/a',group.name,hit] + [str(i) for i in res]
                         handle.write('\t'.join(out) + '\n')
 
@@ -419,6 +541,8 @@ def pipeline_worker(settings,queue,done_queue):
                 infile = group.fasta_file
             if not os.path.isfile(group.exp_alignment_file) or settings.overwrite_hhblits:
                 a3m_hhblits(infile,group.exp_alignment_file,expand_db_path,1)
+            if settings.addss:
+                add_ss(group)
         # Run hhblits
         if settings.expand_alignment:
             infile = group.exp_alignment_file
@@ -431,18 +555,27 @@ def pipeline_worker(settings,queue,done_queue):
             print('Process id %s running hhsearch' %(os.getpid()))
             hhsearch(infile,outfile,db_path,1)
         # Parse the results
-        results = read_hhr(group.results_file)
-        RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=settings.min_prob)
-        if len(RRE_hits) > 0:
-            group.RRE_data = RRE_hits
-            group.RRE_hit = True
-        else:
-            group.RRE_hit = False
+        parse_res(group,RRE_targets,settings,resubmit=False)
         # print('%s %s' %(group.name,group.RRE_hit))
+        if settings.resubmit:
+            resubmit_group(group,RRE_targets,settings)
+        
         print('Process id %s depositing results' %os.getpid())
         done_queue.put(group)
     print('Process %s exiting' %os.getpid())
 
+def count_alignment(group,resubmit=False):
+    if resubmit:
+        infile = group.RRE_expalign_file
+    else:
+        infile = group.exp_alignment_file
+    # Two lines per sequence
+    c = 0
+    with open(infile) as handle:
+        for line in handle:
+            c += 1
+    return(int(c/2))
+        
 
 def main(settings):
     if os.path.isfile(settings.infile):
@@ -479,6 +612,7 @@ def main(settings):
         print('Warning! Output folder with name %s already found - results may be overwritten' %(settings.project_name))
     fasta_folder = os.path.join(data_folder,'fastas')
     results_folder = os.path.join(data_folder,'results')
+    settings.setattrs(fasta_folder=fasta_folder,results_folder=results_folder)
     for folder in data_folder,fasta_folder,results_folder:
         if not os.path.isdir(folder):
             os.mkdir(folder)
@@ -518,7 +652,7 @@ def main(settings):
         all_groups = make_gene_objects(seq_dict,fasta_folder,results_folder,settings.expand_alignment)
     print('Continuing with %i queries, %i of which are groups of genes' %(len(all_groups), len([g for g in all_groups if g.group])))
     
-    if int(settings.cores) < len(all_groups):
+    if int(settings.cores) < len(all_groups) and int(settings.cores) > 1:
         all_groups = pipeline_operator(all_groups,settings)
     else:
         # Get the names of the targets that are considered RRE hits
@@ -526,17 +660,25 @@ def main(settings):
         # Write out fasta files for each gene
         write_fasta(all_groups)
         # For gene groups, align and write a3m files
-        # TODO: Multiprocess muscle
         all_muscle(all_groups)
         # If the alignment needs to be expanded, do so here
         if settings.expand_alignment:
             expand_alignment(all_groups,settings)
+            # Add secondary structure
+            add_all_ss(all_groups)
         # Run hhsearch
         hhsearch_all(all_groups,settings)
         # Parse the results
         parse_all_RREs(all_groups,RRE_targets,settings)
+        # Resubmit if the option is given
+        if settings.resubmit:
+            resubmit_all(all_groups,RRE_targets,settings)
+
     outfile = os.path.join(data_folder,'%s_results.txt' %settings.project_name)
     write_results_summary(all_groups,outfile)
+    if settings.resubmit:
+        outfile_resubmit = os.path.join(data_folder,'%s_RRE_resubmit_results.txt' %(settings.project_name))
+        write_results_summary(all_groups,outfile_resubmit,resubmit=True)
     return all_groups
 
 class Container():
@@ -581,6 +723,8 @@ def parse_arguments():
     parser.add_argument('-m','--min_prob',help='The minimum probability for a hit to be considered significant (reads from config file if none is given)')
     parser.add_argument('--expand_alignment',help='Indicate whether or not the queries should be expanded',default=False,action='store_true')
     parser.add_argument('--group_genes',help='Group found genes first with Diamond/mcl', default=False,action='store_true')
+    parser.add_argument('--resubmit',help='Resubmit found RRE hits with the resubmit database', default=False, action='store_true')
+    parser.add_argument('--addss',help='Add secondary structure prediction (improves sensitivity)', default=False, action='store_true')
     parser.add_argument('-c','--cores',help='Number of cores to use',type=int)
     
     args = parser.parse_args()
