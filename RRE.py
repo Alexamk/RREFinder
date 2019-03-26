@@ -377,7 +377,7 @@ def pipeline_operator(all_groups,settings):
             else:
                 for _ in range(settings.cores):
                     work_queue.put(False)
-        time.sleep(10)
+        time.sleep(1)
     while not results_queue.empty():
         res = results_queue.get()
     print('Joining workers')
@@ -536,7 +536,7 @@ def main(settings):
         # Parse the results
         parse_all_RREs(all_groups,RRE_targets,settings)
     outfile = os.path.join(data_folder,'%s_results.txt' %settings.project_name)
-    write_results_summary(all_groups,settings.outfile)
+    write_results_summary(all_groups,outfile)
     return all_groups
 
 class Container():
