@@ -652,7 +652,7 @@ def main(settings):
         all_groups = make_gene_objects(seq_dict,fasta_folder,results_folder,settings.expand_alignment)
     print('Continuing with %i queries, %i of which are groups of genes' %(len(all_groups), len([g for g in all_groups if g.group])))
     
-    if int(settings.cores) < len(all_groups) and int(settings.cores) > 1:
+    if int(settings.cores) <= len(all_groups) and int(settings.cores) > 1:
         all_groups = pipeline_operator(all_groups,settings)
     else:
         # Get the names of the targets that are considered RRE hits
