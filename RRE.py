@@ -231,9 +231,10 @@ def add_ss(group,resubmit=False,remove=False):
     else:
         infile = group.exp_alignment_file
     newfile = group.exp_alignment_file[:-4] + '_ss.a3m'
-    cmds = ['addss.pl',infile,newfile,'-a3m']
-    print(' '.join(cmds))
-    call(cmds)
+    if not os.path.isfile(newfile):
+        cmds = ['addss.pl',infile,newfile,'-a3m']
+        print(' '.join(cmds))
+        call(cmds)
     if resubmit:
         group.RRE_expalign_file = newfile
         if remove:
@@ -304,6 +305,8 @@ def make_gene_objects(seq_dict,fasta_folder,results_folder,expanded):
     all_genes = []
     for gene,seq in seq_dict.items():
         gene = gene.replace(' ','_')
+        for char in '();:':
+            gene = gene.replace(char,'')
         fasta_file = os.path.join(fasta_folder,gene + '.fasta')
         results_file = os.path.join(results_folder, '%s.hhr' %(gene))
         fasta = '>%s\n%s\n' %(gene,seq)
