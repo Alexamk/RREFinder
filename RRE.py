@@ -515,11 +515,16 @@ def find_RRE_hits_hmm(groups,results):
 def run_hmm(groups,settings):
     tbl_out = os.path.join(settings.results_folder,'hmm_results.tbl')
     hmm_out = os.path.join(settings.results_folder,'hmm_results.txt')
-    fasta_file_all = os.path.join(settings.fasta_folder,'fasta_all.fasta')
-    # Write all fasta files
-    with open(fasta_file_all,'w') as handle:
-        for group in groups:
-            handle.write(group.fasta)
+    if not hasattr(settings,'fasta_file_all'):
+        fasta_file_all = os.path.join(settings.fasta_folder,'fasta_all.fasta')
+        # Write all fasta files
+        with open(fasta_file_all,'w') as handle:
+            for group in groups:
+                handle.write(group.fasta)
+
+    else:
+        # Just use the input fasta if it was a singular sequence
+        fasta_file_all = settings.fasta_file_all
     
     # Now run hmmer
     commands = ['hmmscan','--cpu',str(settings.cores),'-E',str(settings.hmm_evalue),'-o',hmm_out,'--domtblout',tbl_out,\
@@ -713,6 +718,8 @@ def main(settings):
     if os.path.isfile(settings.infile):
         # Singular file
         infile = settings.infile
+        if settings.hmm:
+            settings.fasta_file_all = settings.infile
         print('Reading in file %s' %infile)
     elif os.path.isdir(settings.infile):
         # Get all the relevant files
@@ -730,9 +737,6 @@ def main(settings):
             exit()
         else:
             print('%i %s files found in folder %s' %(len(infile),settings.intype,settings.infile))
-    
-    # Temporary: small testset
-    # infile = infile[0:10]
     
     if settings.intype == 'fasta':
         seq_dict = parse_fasta(infile)
@@ -877,7 +881,7 @@ def parse_arguments():
     
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('project_name',metavar='PROJECT NAME',help='A name for your project (Uses filename if none is provided')
+    parser.add_argument('project_name',metavar='PROJECT NAME',help='A name for your project')
     parser.add_argument('-i','--infile',help='File or folder to be analyzed')
     parser.add_argument('-t','--intype',help='Type of input file to be analyzed (fasta or genbank; default genbank)',default='genbank')
     parser.add_argument('-m','--min_prob',help='The minimum probability for a hit to be considered significant (reads from config file if none is given)')
