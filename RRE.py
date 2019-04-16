@@ -686,7 +686,6 @@ def pipeline_worker(settings,queue,done_queue):
 def pipeline_resubmit_worker(settings,queue,done_queue):
     print('Starting process id: %s'  %os.getpid())
     RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
-    expand_db_path = settings.expand_database_path
     db_path = settings.rre_database_path
     while True:
         try:
