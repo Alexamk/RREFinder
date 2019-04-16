@@ -744,9 +744,9 @@ def main(settings):
         seq_dict = parse_genbank(infile)
     if not hasattr(settings,'project_name'):
         settings.project_name = os.path.basename(settings.infile).rpartition('.')[0]
-    if not os.path.isdir('output'):
-        os.mkdir('output')
-    data_folder = os.path.join('output',settings.project_name)
+    if not os.path.isdir(settings.outputfolder):
+        os.mkdir(settings.outputfolder)
+    data_folder = os.path.join(settings.outputfolder,settings.project_name)
     if os.path.isdir(data_folder):
         print('Warning! Output folder with name %s already found - results may be overwritten' %(settings.project_name))
     fasta_folder = os.path.join(data_folder,'fastas')
@@ -883,6 +883,7 @@ def parse_arguments():
     parser.add_argument('project_name',metavar='PROJECT NAME',help='A name for your project')
     parser.add_argument('-i','--infile',help='File or folder to be analyzed')
     parser.add_argument('-t','--intype',help='Type of input file to be analyzed (fasta or genbank; default genbank)',default='genbank')
+    parser.add_argument('-o','--outfolder',help='Folder where the output will be generated (default: output)',default='output')
     parser.add_argument('-m','--min_prob',help='The minimum probability for a hit to be considered significant (reads from config file if none is given)')
     parser.add_argument('--expand_alignment',help='Indicate whether or not the queries should be expanded',default=False,action='store_true')
     parser.add_argument('--group_genes',help='Group found genes first with Diamond/mcl', default=False,action='store_true')
