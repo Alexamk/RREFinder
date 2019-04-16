@@ -517,6 +517,7 @@ def run_hmm(groups,settings):
     hmm_out = os.path.join(settings.results_folder,'hmm_results.txt')
     if not hasattr(settings,'fasta_file_all'):
         fasta_file_all = os.path.join(settings.fasta_folder,'fasta_all.fasta')
+        print('Rewriting fasta')
         # Write all fasta files
         with open(fasta_file_all,'w') as handle:
             for group in groups:
@@ -719,6 +720,7 @@ def main(settings):
         # Singular file
         infile = settings.infile
         if settings.hmm:
+            print('Setting fasta_file_all')
             settings.fasta_file_all = settings.infile
         print('Reading in file %s' %infile)
     elif os.path.isdir(settings.infile):
@@ -752,8 +754,6 @@ def main(settings):
     fasta_folder = os.path.join(data_folder,'fastas')
     results_folder = os.path.join(data_folder,'results')
     settings.setattrs(fasta_folder=fasta_folder,results_folder=results_folder)
-    if settings.hmm:
-        settings.fasta_file_all = fasta_file_all = os.path.join(fasta_folder,'fasta_all.fasta')
         
     for folder in data_folder,fasta_folder,results_folder:
         if not os.path.isdir(folder):
