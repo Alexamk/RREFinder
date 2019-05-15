@@ -495,19 +495,26 @@ def parse_hmm_domtbl(p):
             outd[protein_name].append([domain_found,seq_start,seq_end,domain_evalue])
     return outd
 
-def find_RRE_hits_hmm(groups,results):
+def find_RRE_hits_hmm(groups,results,min_len=0):
     for group in groups:
         if group.name in results:
             domains_found = results[group.name]
             # Get the domain with the lowest e-value
             lowest_ev = 100
+            best_domain = None
             for domain in domains_found:
-                ev = domain[-1]
+                length = domain[2] - domain[1]
+                if length < min_len:
+                    continue
+                ev = domain[-1]                
                 if ev < lowest_ev:
                     lowest_ev = ev
                     best_domain = domain
-            group.RRE_hit = True
-            group.RRE_data = ['hmm',best_domain]
+            if best_domain:
+                group.RRE_hit = True
+                group.RRE_data = ['hmm',best_domain]
+            else:
+                group.RRE_hit = False
         else:
             group.RRE_hit = False
     
@@ -516,7 +523,7 @@ def run_hmm(groups,settings):
     tbl_out = os.path.join(settings.results_folder,'hmm_results.tbl')
     hmm_out = os.path.join(settings.results_folder,'hmm_results.txt')
     if not hasattr(settings,'fasta_file_all'):
-        fasta_file_all = os.path.join(settings.fasta_folder,'fasta_all.fasta')
+        settings.fasta_file_all = fasta_file_all = os.path.join(settings.fasta_folder,'fasta_all.fasta')
         print('Rewriting fasta')
         # Write all fasta files
         with open(fasta_file_all,'w') as handle:
@@ -528,15 +535,16 @@ def run_hmm(groups,settings):
         fasta_file_all = settings.fasta_file_all
     
     # Now run hmmer
-    commands = ['hmmscan','--cpu',str(settings.cores),'-E',str(settings.hmm_evalue),'-o',hmm_out,'--domtblout',tbl_out,\
-                settings.hmm_db,settings.fasta_file_all]
-    print(' '.join(commands))
-    call(commands)
+    if not os.path.isfile(tbl_out):
+        commands = ['hmmscan','--cpu',str(settings.cores),'-E',str(settings.hmm_evalue),'-o',hmm_out,'--domtblout',tbl_out,\
+                    settings.hmm_db,settings.fasta_file_all]
+        print(' '.join(commands))
+        call(commands)
     
     # Parse the results
     results = parse_hmm_domtbl(tbl_out)
     # Interpret the results and assign RRE hits
-    find_RRE_hits_hmm(groups,results)
+    find_RRE_hits_hmm(groups,results,settings.hmm_minlen)
     
     
 def write_results_summary(all_groups,outfile,resubmit=False,hmm=False):
@@ -718,9 +726,6 @@ def main(settings):
     if os.path.isfile(settings.infile):
         # Singular file
         infile = settings.infile
-        if settings.hmm:
-            print('Setting fasta_file_all')
-            settings.fasta_file_all = settings.infile
         print('Reading in file %s' %infile)
     elif os.path.isdir(settings.infile):
         # Get all the relevant files
@@ -882,7 +887,7 @@ def parse_arguments():
     parser.add_argument('project_name',metavar='PROJECT NAME',help='A name for your project')
     parser.add_argument('-i','--infile',help='File or folder to be analyzed')
     parser.add_argument('-t','--intype',help='Type of input file to be analyzed (fasta or genbank; default genbank)',default='genbank')
-    parser.add_argument('-o','--outfolder',help='Folder where the output will be generated (default: output)',default='output')
+    parser.add_argument('-o','--outputfolder',help='Folder where the output will be generated (default: output)',default='output')
     parser.add_argument('-m','--min_prob',help='The minimum probability for a hit to be considered significant (reads from config file if none is given)')
     parser.add_argument('--expand_alignment',help='Indicate whether or not the queries should be expanded',default=False,action='store_true')
     parser.add_argument('--group_genes',help='Group found genes first with Diamond/mcl', default=False,action='store_true')
