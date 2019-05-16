@@ -279,13 +279,14 @@ def hhsearch(inf,outf,db,threads):
     commands = ['hhsearch','-cpu',str(threads),'-d',db,'-i',inf,'-o',outf, '-v','0']
     call(commands)
 
-def find_RRE_hits(results,targets,min_prob = 50.0):
+def find_RRE_hits(results,targets,min_prob = 50.0,min_len = 0):
     sign_hits = {}
     for res in results:
         for target in targets:
             if res.startswith(target):
                 prob = results[res][0]
-                if prob >= min_prob:
+                start,end = (int(i) for i in results[res][6].split('-'))
+                if prob >= min_prob and (end-start) > min_len:
                     sign_hits[res] = results[res]
                     break
     return sign_hits
@@ -430,7 +431,7 @@ def resubmit_group(group,RRE_targets,settings,cores):
 def parse_res(group,RRE_targets,settings,resubmit=False):
     if resubmit:
         results = read_hhr(group.RRE_results_file)
-        RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=settings.min_prob)
+        RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=settings.min_prob,min_len = settings.min_len_alignment)
         if len(RRE_hits) > 0:
             group.RRE_resubmit_hit = True
             group.RRE_resubmit_data = ['hhpred',RRE_hits]
@@ -442,7 +443,7 @@ def parse_res(group,RRE_targets,settings,resubmit=False):
         else:
             prob = settings.min_prob
         results = read_hhr(group.results_file)
-        RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=prob)
+        RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=prob,min_len = settings.min_len_alignment)
         if len(RRE_hits) > 0:
             group.RRE_data = ['hhpred',RRE_hits]
             group.RRE_hit = True
