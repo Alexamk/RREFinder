@@ -847,7 +847,7 @@ def main(settings):
     if settings.resubmit:
         outfile_resubmit = os.path.join(data_folder,'%s_RRE_resubmit_results.txt' %(settings.project_name))
         write_results_summary(all_groups,outfile_resubmit,resubmit=True)
-    return all_groups
+    return all_groups,data_folder
 
 class Container():
     # Container for provided settings and to store info on genes
@@ -905,18 +905,27 @@ def parse_arguments():
             
     return settings
 
+def log(text,f):
+    print(text)
+    with open(f,'a') as handle:
+        handle.write(text)
+
 if __name__ == '__main__':
     settings = parse_arguments()
     if settings.expand_alignment and not settings.expand_database_path:
         print('Expanding the alignment requires a database. Please set the path in the config file')
         exit()
     t0 = time.time()
-    res = main(settings)
+    res,data_folder = main(settings)
     t1 = time.time()
-    print('Finished. Total time: %.2f seconds' %(t1-t0))
-    print('Hits found: %i out of %i' %(len([i for i in res if i.RRE_hit]),len(res)))
+    logfile = os.path.join(data_folder,'log.txt')
+    if os.path.isfile(logfile):
+        os.remove(logfile)
+    log('Finished. Total time: %.2f seconds (on %i cores)' %((t1-t0),settings.cores),logfile)
+    log('Hits found: %i out of %i' %(len([i for i in res if i.RRE_hit]),len(res)),logfile)
     if settings.resubmit:
-        print('Resubmit hits found: %i out of %i' %(len([i for i in res if i.RRE_hit and i.RRE_resubmit_hit]),len(res)))
+        log('Resubmit hits found: %i out of %i' %(len([i for i in res if i.RRE_hit and i.RRE_resubmit_hit]),len(res)),logfile)
+
 
 
 
