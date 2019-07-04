@@ -495,6 +495,41 @@ def parse_hmm_domtbl(p):
                 outd[protein_name] = []
             outd[protein_name].append([domain_found,seq_start,seq_end,domain_evalue])
     return outd
+    
+def parse_hmm_domtbl_hmmsearch(p):
+    # Parse per domain found
+    # Sort out overlap later
+    with open(p) as f:
+        outd = {}
+        for _ in range(3):
+            l = f.readline()
+        for l in f:
+            if l.startswith('#'):
+                continue
+            tabs = l.strip().split(' ')
+            tabs = [tab for tab in tabs if tab != '']
+            protein_name = tabs[0]
+            domain_found = tabs[4]
+#                print protein_name,domain_found
+            if '.' in domain_found:
+                domain_found = domain_found.rpartition('.')[0]
+            domain_evalue = tabs[12]
+            if 'e' in domain_evalue:
+                parts = domain_evalue.split('e')
+#                    print domain_evalue,parts
+                domain_evalue = float(parts[0])*10**int(parts[1])
+            else:
+                domain_evalue = float(domain_evalue)
+#                print(tabs[17],tabs[18])
+            seq_start = int(tabs[17])
+            seq_end = int(tabs[18])
+            if seq_start > seq_end:
+#                print 'Seq start after end: %s' %protein_name
+                pass
+            if protein_name not in outd:
+                outd[protein_name] = []
+            outd[protein_name].append([domain_found,seq_start,seq_end,domain_evalue])
+    return outd
 
 def find_RRE_hits_hmm(groups,results,min_len=0):
     for group in groups:
@@ -537,13 +572,13 @@ def run_hmm(groups,settings):
     
     # Now run hmmer
     if not os.path.isfile(tbl_out):
-        commands = ['hmmscan','--cpu',str(settings.cores),'-E',str(settings.hmm_evalue),'-o',hmm_out,'--domtblout',tbl_out,\
+        commands = ['hmmsearch','--cpu',str(settings.cores),'-E',str(settings.hmm_evalue),'-o',hmm_out,'--domtblout',tbl_out,\
                     settings.hmm_db,settings.fasta_file_all]
         print(' '.join(commands))
         call(commands)
     
     # Parse the results
-    results = parse_hmm_domtbl(tbl_out)
+    results = parse_hmm_domtbl_hmmsearch(tbl_out)
     # Interpret the results and assign RRE hits
     find_RRE_hits_hmm(groups,results,settings.hmm_minlen)
     
