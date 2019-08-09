@@ -192,7 +192,7 @@ def dict_to_fasta(d,f=False,mode='w'):
     return s
             
 def expand_alignment(all_groups,settings,resubmit=False):
-    settings.logger.log('Expanding alignments')
+    settings.logger.log('Expanding alignments',1)
     db_path = settings.expand_database_path
     if resubmit:
         nr_iter = settings.resubmit_initial_hhblits_iter
@@ -210,11 +210,11 @@ def a3m_hhblits(inf,outf,db,settings,threads=1,n=3):
     clean = outf.rpartition('.')[0]
     dumpfile = clean + '.hhr'
     commands = ['hhblits','-cpu',str(threads),'-d',db,'-i',inf,'-oa3m',outf,'-o',dumpfile,'-v','0','-n',str(n)]
-    settings.logger.log(' '.join(commands))
+    settings.logger.log(' '.join(commands),2)
     call(commands)
     
 def all_muscle(all_groups,settings):
-    settings.logger.log('Aligning groups')
+    settings.logger.log('Aligning groups',1)
     for group in all_groups:
         if group.group:
             if not os.path.isfile(group.muscle_file):
@@ -224,7 +224,7 @@ def all_muscle(all_groups,settings):
 
 def reformat(inf,outf,settings):
     commands = ['reformat.pl','fas','a3m',inf,outf]
-    settings.logger.log(' '.join(commands))
+    settings.logger.log(' '.join(commands),2)
     call(commands)
 
 def muscle(inf,outf,settings,clw=False,quiet=True):
@@ -233,7 +233,7 @@ def muscle(inf,outf,settings,clw=False,quiet=True):
         commands.append('-clw')
     if quiet:
         commands.append('-quiet')
-    settings.logger.log(' '.join(commands))
+    settings.logger.log(' '.join(commands),2)
     call(commands)
     return outf
 
@@ -248,12 +248,12 @@ def add_ss(group,settings,resubmit=False,remove=False):
     with open(infile) as handle:
         text = handle.read()
     if text.count('>') == 1:
-        settings.logger.log('Only one entry found in infile %s. Not adding secondary structure' %(infile))
+        settings.logger.log('Only one entry found in infile %s. Not adding secondary structure' %(infile),2)
     else:
         newfile = infile[:-4] + '_ss.a3m'
         if not os.path.isfile(newfile):
             cmds = ['addss.pl',infile,newfile,'-a3m']
-            settings.logger.log(' '.join(cmds))
+            settings.logger.log(' '.join(cmds),2)
             call(cmds)
         if resubmit:
             group.RRE_expalign_file = newfile
@@ -265,13 +265,13 @@ def add_ss(group,settings,resubmit=False,remove=False):
                 os.remove(infile)
 
 def add_all_ss(groups,settings,resubmit=False):
-    settings.logger.log('Adding secondary structure')
+    settings.logger.log('Adding secondary structure',1)
     for group in groups:
         add_ss(group,settings,resubmit=resubmit)
         
 
 def hhsearch_all(all_groups,settings):
-    settings.logger.log('Running hhsearch')
+    settings.logger.log('Running hhsearch',1)
     db_path = settings.rre_database_path
     for group in all_groups:
         if settings.rrefinder_primary_mode == 'hhpred':
@@ -471,14 +471,14 @@ def resubmit_group(group,RRE_targets,settings,cores):
     if not os.path.isfile(group.RRE_results_file):
         hhsearch(group.RRE_expalign_file,group.RRE_results_file,db_path,settings.cores)
     # Parse the results
-    settings.logger.log('Parsing results')
+    settings.logger.log('Parsing results',1)
     parse_hhpred_res(group,RRE_targets,settings,resubmit=True)
     
 def parse_hhpred_res(group,RRE_targets,settings,resubmit=False):
     if resubmit:
         results = read_hhr(group.RRE_results_file)
         RRE_hits = find_RRE_hits(results,RRE_targets,min_prob=settings.min_prob,min_len = settings.min_len_alignment)
-        settings.logger.log('Found %i RRE hits' %len(RRE_hits))
+        settings.logger.log('Found %i RRE hits' %len(RRE_hits),2)
         if len(RRE_hits) > 0:
             group.RRE_resubmit_hit = True
             group.RRE_resubmit_data = ['hhpred',RRE_hits]
@@ -521,7 +521,7 @@ def parse_all_RREs(groups,RRE_targets,settings,resubmit=False):
         parse_hhpred_res(group,RRE_targets,settings,resubmit)
 
 def resubmit_all(groups,RRE_targets,settings):
-    settings.logger.log('Resubmitting %i found RREs' %(len([i for i in groups if i.RRE_hit])))
+    settings.logger.log('Resubmitting %i found RREs' %(len([i for i in groups if i.RRE_hit])),1)
     for group in groups:
         if group.RRE_hit:
             resubmit_group(group,RRE_targets,settings,settings.cores)
@@ -744,7 +744,7 @@ def write_results_summary(all_groups,outfile,mode,resubmit=False,hmm=False,regul
         
 
 def pipeline_operator(all_groups,settings,worker_function,time_sleep=1):
-    print('Splitting work over %i processes' %settings.cores)
+    settings.logger.log('Splitting work over %i processes' %settings.cores,1)
     work_queue = Queue()
     results_queue = Queue()
     
@@ -754,7 +754,7 @@ def pipeline_operator(all_groups,settings,worker_function,time_sleep=1):
         return groups[nr:]
     
     all_groups = put_jobs(all_groups,work_queue,5*settings.cores)
-    settings.logger.log('Creating workers')
+    settings.logger.log('Creating workers',2)
     workers = []
     data_worker = [settings,work_queue,results_queue]
     for i in range(settings.cores):
@@ -765,10 +765,10 @@ def pipeline_operator(all_groups,settings,worker_function,time_sleep=1):
         worker.start()
     
     while any([w.is_alive() for w in workers]):
-        settings.logger.log('%i workers still alive' %(len([w.is_alive() for w in workers])))
-        settings.logger.log('Work queue: %i; all_groups: %i' %(work_queue.qsize(),len(all_groups)))
+        settings.logger.log('%i workers still alive' %(len([w.is_alive() for w in workers])),2)
+        settings.logger.log('Work queue: %i; all_groups: %i' %(work_queue.qsize(),len(all_groups)),2)
         while not results_queue.empty():
-            settings.logger.log('Found %i results in queue' %results_queue.qsize())
+            settings.logger.log('Found %i results in queue' %results_queue.qsize(),2)
             res = results_queue.get()
             results.append(res)
         if work_queue.qsize() < settings.cores:
@@ -781,7 +781,7 @@ def pipeline_operator(all_groups,settings,worker_function,time_sleep=1):
     while not results_queue.empty():
         res = results_queue.get()
         results.append(res)
-    settings.logger.log('Joining workers')
+    settings.logger.log('Joining workers',2)
     for worker in workers:
         worker.join()
     return results,workers
@@ -789,7 +789,7 @@ def pipeline_operator(all_groups,settings,worker_function,time_sleep=1):
 def pipeline_worker(settings,queue,done_queue):
     # Create a personal logger file
     logfile = os.path.join(settings.log_folder,'log_basic_%s.txt' %(os.getpid()))
-    logger = Log(logfile)
+    logger = Log(logfile,settings.verbosity)
     logger.log('Starting process id (pipeline_worker): %s'  %os.getpid())
     settings_copy = settings.new()
     settings_copy.logger = logger
@@ -853,7 +853,7 @@ def pipeline_worker(settings,queue,done_queue):
 
 def pipeline_resubmit_worker(settings,queue,done_queue):
     logfile = os.path.join(settings.log_folder,'log_resubmit_%s.txt' %(os.getpid()))
-    logger = Log(logfile)
+    logger = Log(logfile,settings.verbosity)
     settings_copy = settings.new()
     settings_copy.logger = logger
     logger.log('Starting process id (pipeline_resubmit_worker): %s'  %os.getpid())
@@ -1052,9 +1052,9 @@ def parse_infiles(settings):
         infile = settings.infile
         if not ((settings.intype == 'fasta' and any([infile.endswith(ext) for ext in ['.fas','.fasta','.faa']])) or \
                 (settings.intype == 'genbank' and any([infile.endswith(ext) for ext in ['.gbk','.gbff']]))):
-            settings.logger.log('File of invalid type. Please specify the file type with -t or --intype')
+            settings.logger.log('File of invalid type. Please specify the file type with -t or --intype',0)
             return {}
-        settings.logger.log('Reading in file %s' %infile)
+        settings.logger.log('Reading in file %s' %infile,1)
     elif os.path.isdir(settings.infile):
         # Get all the relevant files
         files = os.listdir(settings.infile)
@@ -1063,16 +1063,16 @@ def parse_infiles(settings):
         elif settings.intype == 'genbank':
             exts = ['.gbk','.gbff']
         else:
-            settings.logger.log('Non-legal file type given. Please choose from genbank or fasta')
+            settings.logger.log('Non-legal file type given. Please choose from genbank or fasta',0)
             return {}
         infile = [os.path.join(settings.infile,f) for f in files if any([f.endswith(ext) for ext in exts]) and os.path.isfile(os.path.join(settings.infile,f))]
         if len(infile) == 0:
-            settings.logger.log('No %s files found in folder %s' %(settings.intype,settings.infile))
+            settings.logger.log('No %s files found in folder %s' %(settings.intype,settings.infile),0)
             return {}
         else:
-            settings.logger.log('%i %s files found in folder %s' %(len(infile),settings.intype,settings.infile))
+            settings.logger.log('%i %s files found in folder %s' %(len(infile),settings.intype,settings.infile),0)
     else:
-        settings.logger.log('No valid file or directory given')
+        settings.logger.log('No valid file or directory given',0)
         return {}
     
     if settings.intype == 'fasta':
@@ -1089,7 +1089,7 @@ def main(settings):
     # Make some folders
     make_folders(settings)
     # Set the logfile
-    logger = Log(settings.logfile)
+    logger = Log(settings.logfile,settings.verbosity)
     settings.logger = logger
     # Get the names of the targets that are considered RRE hits
     RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
@@ -1140,7 +1140,7 @@ def main(settings):
         all_groups += remaining_groups
     else:
         all_groups = make_gene_objects(seq_dict,settings)
-    settings.logger.log('Continuing with %i queries, %i of which are groups of genes' %(len(all_groups), len([g for g in all_groups if g.group])))
+    settings.logger.log('Continuing with %i queries, %i of which are groups of genes' %(len(all_groups), len([g for g in all_groups if g.group])),1)
     
     if settings.mode == 'rrefinder' or settings.mode == 'both':
         all_groups = rrefinder_main(settings,all_groups)
@@ -1181,16 +1181,18 @@ class Container():
         return c
             
 class Log():
-    def __init__(self,logfile,remove_first=True):
+    def __init__(self,logfile,verbosity,remove_first=True):
         self.logfile = logfile
+        self.verbosity = verbosity
         if remove_first and os.path.isfile(logfile):
             os.remove(logfile)
     
-    def log(self,text,write=True):
-        print(text)
-        if write:
-            with open(self.logfile,'a') as handle:
-                handle.write(text + '\n')
+    def log(self,text,verbosity_req,write=True):
+        if self.verbosity >= verbosity_req:
+            print(text)
+            if write:
+                with open(self.logfile,'a') as handle:
+                    handle.write(text + '\n')
 
             
     
@@ -1236,7 +1238,7 @@ def parse_arguments(configpath):
     parser.add_argument('-o','--outputfolder',help='Folder where the output will be generated (default: output)',default='output')
     parser.add_argument('-c','--cores',help='Number of cores to use',type=int)
     parser.add_argument('-m','--mode',help='The mode to run (rrefinder,rrefam,both)', choices=['rrefinder','rrefam','both'])
-    parser.add_argument('-v','--verbosity',help='Verbosity (0-2)',choices=[0,1,2],type=int,default=1)
+    parser.add_argument('-v','--verbosity',help='Verbosity (0-2; default: 1)',choices=[0,1,2],type=int,default=1)
     parser.add_argument('--regulator_filter',help='Filter out found regulatory/HTH pfams',default=False,action='store_true')
     
     rrefinder = parser.add_argument_group('RREfinder settings')
@@ -1261,17 +1263,16 @@ if __name__ == '__main__':
     configpath = 'config.ini'
     settings = parse_arguments(configpath)
     if settings.rrefinder_primary_mode == 'hhpred' and not settings.expand_database_path:
-        log('Using HHpred as initial mode for RREfinder requires a database. Please set the path in the config file')
+        print('Using HHpred as initial mode for RREfinder requires a database. Please set the path in the config file')
         exit()
     t0 = time.time()
-#    all_groups = main(settings)
     res = main(settings)
     hits = [i for i in res if i.RRE_hit]
     t1 = time.time()
-    settings.logger.log('Finished. Total time: %.2f seconds (on %i cores)' %((t1-t0),settings.cores))
-    settings.logger.log('Hits found: %i out of %i' %(len([i for i in res if i.RRE_hit]),len(res)))
+    settings.logger.log('Finished. Total time: %.2f seconds (on %i cores)' %((t1-t0),settings.cores),1)
+    settings.logger.log('Hits found: %i out of %i' %(len([i for i in res if i.RRE_hit]),len(res)),1)
     if settings.resubmit:
-        settings.logger.log('Resubmit hits found: %i out of %i' %(len([i for i in res if i.RRE_hit and i.RRE_resubmit_hit]),len(res)))
+        settings.logger.log('Resubmit hits found: %i out of %i' %(len([i for i in res if i.RRE_hit and i.RRE_resubmit_hit]),len(res)),1)
 
 
 
