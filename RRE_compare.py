@@ -109,19 +109,32 @@ if __name__ == '__main__':
 #    all_res['hmmv3_custom'] = parse_results('output/RiPPTIDEtest_vs_phmm_v3_iter3_resubmit_custom/RiPPTIDEtest_vs_phmm_v3_iter3_resubmit_custom_RRE_resubmit_results.txt')
 #    all_res['hmmv3_uni'] = parse_results('output/RiPPTIDEtest_vs_phmm_v3_iter3_resubmit_uni/RiPPTIDEtest_vs_phmm_v3_iter3_resubmit_uni_RRE_resubmit_results.txt')
 
-    all_res['custom'] = parse_results('output/RiPPTIDEtest_vs_phmm_v3_resubmit_custom_addss3/RiPPTIDEtest_vs_phmm_v3_resubmit_custom_addss3_RRE_resubmit_results.txt')
-    all_res['uni'] = parse_results('output/RiPPTIDEtest_vs_phmm_v3_resubmit_uni_addss3/RiPPTIDEtest_vs_phmm_v3_resubmit_uni_addss3_RRE_resubmit_results.txt')
-
+#    c = all_res['custom'] = parse_results('/vol/home/kloostermanam/Documents/Scripts/rrefinder/RREfinder RiPPTIDE testset/custom/RiPPTIDEtest_vs_phmm_v3_resubmit_custom_addss3_RRE_resubmit_results.txt')
+#    u = all_res['uni'] = parse_results('/vol/home/kloostermanam/Documents/Scripts/rrefinder/RREfinder RiPPTIDE testset/uni/RiPPTIDEtest_vs_phmm_v3_resubmit_uni_addss3_RRE_resubmit_results.txt')
+    
+    all_res['IPR000594'] = parse_results('/vol/home/kloostermanam/Documents/RREfinder results/interpro RRE results/ipr000594_thif_custom_resubmit_RRE_resubmit_results.txt')
+    all_res['IPR003776'] = parse_results('/vol/home/kloostermanam/Documents/RREfinder results/interpro RRE results/ipr003776_ycao_custom_resubmit_RRE_resubmit_results.txt')
+    all_res['IPR006827'] = parse_results('/vol/home/kloostermanam/Documents/RREfinder results/interpro RRE results/ipr006827_lanb_custom_resubmit_RRE_resubmit_results.txt')
+    all_res['IPR007197'] = parse_results('/vol/home/kloostermanam/Documents/RREfinder results/interpro RRE results/ipr007197_rsam_custom_resubmit_RRE_resubmit_results.txt')
+    all_res['IPR032708'] = parse_results('/vol/home/kloostermanam/Documents/RREfinder results/interpro RRE results/ipr032708_transglut_custom_resubmit_RRE_resubmit_results.txt')
+    
     for res in all_res:
         print('Group: %s. Number of results: %s' %(res,len(all_res[res])))
-    all_shared = compare_pairs(all_res.values())
-    print('All groups: %i' %len(all_shared))
+        with open(res+'_RREfinder_results.txt','w') as handle:
+            for key in all_res[res]:
+                handle.write('%s\n' %key)
+            
     
-    for group in get_all_subgroups(all_res.keys()):
-        ds = [all_res[i] for i in group]
-        shared = compare_pairs(ds)
-        print('Comparing group with %s. Shared: %i' %(', '.join(group),len(shared)))
-    
+#    for res in all_res:
+#        print('Group: %s. Number of results: %s' %(res,len(all_res[res])))
+#    all_shared = compare_pairs(all_res.values())
+#    print('All groups: %i' %len(all_shared))
+#    
+#    for group in get_all_subgroups(all_res.keys()):
+#        ds = [all_res[i] for i in group]
+#        shared = compare_pairs(ds)
+#        print('Comparing group with %s. Shared: %i' %(', '.join(group),len(shared)))
+#    
     
     
 
