@@ -813,7 +813,7 @@ def pipeline_worker(settings,queue,done_queue):
             continue
         if group == False:
             break
-        logger.log('Process id %s starting work on group %s' %(os.getpid(),group.name))
+        logger.log('Process id %s starting work on group %s' %(os.getpid(),group.name),2)
         # Write out fasta files for each gene
         if not os.path.isfile(group.fasta_file):
             with open(group.fasta_file,'w') as handle:
@@ -826,7 +826,7 @@ def pipeline_worker(settings,queue,done_queue):
                 reformat(group.muscle_file,group.a3m_file)
         # If the alignment needs to be expanded, do so here
         if settings_copy.rrefinder_primary_mode == 'hhpred':
-            logger.log('Process id %s expanding alignment' %(os.getpid()))
+            logger.log('Process id %s expanding alignment' %(os.getpid()),2)
             if group.group:
                 infile = group.a3m_file
             else:
@@ -848,16 +848,16 @@ def pipeline_worker(settings,queue,done_queue):
             infile = group.fasta_file
         outfile = group.results_file
         if not os.path.isfile(outfile) or settings_copy.overwrite_hhblits:
-            logger.log('Process id %s running hhsearch' %(os.getpid()))
+            logger.log('Process id %s running hhsearch' %(os.getpid()),2)
             hhsearch(settings_copy,infile,outfile,db_path,1)
         # Parse the results
         parse_hhpred_res(group,RRE_targets,settings_copy,resubmit=False)
         if group.RRE_hit and settings_copy.resubmit:
             resubmit_group(group,RRE_targets,settings_copy,1)
         
-        logger.log('Process id %s depositing results' %os.getpid())
+        logger.log('Process id %s depositing results' %os.getpid(),2)
         done_queue.put(group)
-    logger.log('Process %s exiting' %os.getpid())
+    logger.log('Process %s exiting' %os.getpid(),2)
 
 def pipeline_resubmit_worker(settings,queue,done_queue):
     logfile = os.path.join(settings.log_folder,'log_resubmit_%s.txt' %(os.getpid()))
