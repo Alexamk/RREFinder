@@ -798,7 +798,7 @@ def pipeline_worker(settings,queue,done_queue):
     # Create a personal logger file
     logfile = os.path.join(settings.log_folder,'log_basic_%s.txt' %(os.getpid()))
     logger = Log(logfile,settings.verbosity)
-    logger.log('Starting process id (pipeline_worker): %s'  %os.getpid())
+    logger.log('Starting process id (pipeline_worker): %s'  %os.getpid(),2)
     settings_copy = settings.new()
     settings_copy.logger = logger
     RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
