@@ -1,0 +1,63 @@
+Quick installation guide for RREfinder
+
+Install the included conda environment with "conda env create -f RREfinder.yml"
+Or make sure the following packages/programs are installed and in your path
+    - HMMer
+    - PSIPRED
+    - python package Biopython
+
+Part of the HHpred algorithm is to add secondary structure prediction with PSIPRED.
+I recommend using the conda package to install PSIPRED, because it's quite a pain to install manually 
+(mostly because it uses legacy BLAST). The authors recognize that it is a pain to install, and recommend
+skipping the installation, as it doesn't add much to the probability of the prediction. While this may
+be true for the majority of hits, my experience is that many RREs aren't found without the secondary 
+structure prediction.
+
+Install the HHsuite V3 or above (https://github.com/soedinglab/hh-suite)
+    - Make sure the following parameters are set (which is part of their recommended installation)
+    
+      1) $HHLIB is set to the folder containing the HHsuite tool
+      2) The binary files and the script files are in your path 
+        (i.e. if you open a terminal and type "hhblits" or "addss.pl", both should be recognized commands)
+        Easiest way to do this is to modify the .bashrc file, and add a few extra lines:
+        export HHLIB="/path/to/HHsuite"
+        export PATH="$HHLIB/bin:$HHLIB/scripts:$PATH"
+        Then reboot the terminal or rerun the file (source ~/.bashrc)
+       
+    - Configure the HHsuite paths:
+      1) Find the file HHPaths.pm in the scripts folder 
+      2) You should see a section looking like this:
+      
+##############################################################################################
+# PLEASE COMPLETE THE PATHS ... TO PSIPRED AND OLD-STYLE BLAST (NOT BLAST+) (NEEDED FOR PSIPRED) 
+#our $execdir = ".../psipred/bin";         # path to PSIPRED V2 binaries
+#our $datadir = ".../psipred/data";        # path to PSIPRED V2 data files
+#our $ncbidir = ".../blast/bin";           # path to NCBI binaries (for PSIPRED in addss.pl)
+
+      3) Complete the paths
+         For the $execdir and the $ncbidir, the easiest way is to see where your psipred binary is located, and point to that folder
+         In the conda package, the ncbidir is the same thing, as that folder also contains the blastpgp program (legacy blast)
+         e.g. /path/to/conda/envs/RREfinder/bin
+         
+         For the $datadir, you need to find where the psipred data is stored in the conda package.
+         On my system, that would be /path/to/conda/envs/RREfinder/share/psipred_4.01/data
+         On a different system (with a different conda setup), I've found it at /path/to/conda/pkgs/psipred_4.01/share/psipred_4.01/data
+         Not sure about your setup, so let me know what you find :)
+         The data folder should contain some files named weights.dat or some variation of it.
+         
+         Alternatively, if you manually install PSIPRED, let the execdir point to the folder containing the psipred binary,
+         the datadir to the folder containing the psipred data and the ncbidir to the folder containing the legacy BLAST binary (blastpgp)
+         
+Finally, do a quick check through the config file. The resubmit_database should point to the (relatively) large database in the data/database folder, 
+while the rrefam database should point to your hmm file in data/hmm folder. You can also set some more detailed options here (although you can override 
+some settings in the config file by providing them when you run the script on the command line).
+
+RREfinder is now ready for use!
+
+P.S. If you want to run the original HHpred (as in, the way they run it on the website), you'll have to download the uniclust database (~100 GB).
+It's located on http://gwdu111.gwdg.de/~compbiol/uniclust/2018_08/ (uniclust30_2018_08_hhsuite.tar.gz is the one you need).
+Then simply point your expand_database and resubmit_database to the uniclust database.
+
+
+
+         
