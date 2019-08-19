@@ -12,7 +12,7 @@ if PYTHON_VERSION == 2:
 elif PYTHON_VERSION == 3:
     import configparser
 
-from subprocess import call
+from subprocess import call, Popen, PIPE
 
 from multiprocessing import Process, Queue
 
@@ -175,7 +175,7 @@ def write_fasta(all_groups):
 def write_fasta_single(settings,groups):
     if not hasattr(settings,'fasta_file_all'):
         settings.fasta_file_all = fasta_file_all = os.path.join(settings.fasta_folder,'fasta_all.fasta')
-        print('Rewriting fasta')
+        settings.logger.log('Rewriting fasta',1)
         # Write all fasta files
         with open(fasta_file_all,'w') as handle:
             for group in groups:
@@ -197,7 +197,7 @@ def expand_alignment(all_groups,settings,resubmit=False):
     if resubmit:
         nr_iter = settings.resubmit_initial_hhblits_iter
     else:
-        nr_iter = 3
+        nr_iter = settings.hhbllits_iter
     for group in all_groups:
         if group.group:
             infile = group.a3m_file
@@ -254,7 +254,12 @@ def add_ss(group,settings,resubmit=False,remove=False):
         if not os.path.isfile(newfile):
             cmds = ['addss.pl',infile,newfile,'-a3m']
             settings.logger.log(' '.join(cmds),2)
-            call(cmds)
+            p = Popen(cmds,stdout=PIPE,stderr=PIPE)
+            p.wait()
+            stdout = p.stdout.read()
+            settings.logger.log(stdout,2)
+            stderr = p.stderr.read()
+            settings.logger.log(stderr,2)
         if resubmit:
             group.RRE_expalign_file = newfile
             if remove:
@@ -282,10 +287,11 @@ def hhsearch_all(all_groups,settings):
             infile = group.fasta_file
         outfile = group.results_file
         if not os.path.isfile(outfile) or settings.overwrite_hhblits:
-            hhsearch(infile,outfile,db_path,settings.cores)
+            hhsearch(settings,infile,outfile,db_path,settings.cores)
 
-def hhsearch(inf,outf,db,threads):
+def hhsearch(settings,inf,outf,db,threads):
     commands = ['hhsearch','-cpu',str(threads),'-d',db,'-i',inf,'-o',outf, '-v','0']
+    settings.logger.log(' '.join(commands),2)
     call(commands)
 
 def find_RRE_hits(results,targets,min_prob = 50.0,min_len = 0):
@@ -469,9 +475,9 @@ def resubmit_group(group,RRE_targets,settings,cores):
     # Run HHsearch
     db_path = settings.rre_database_path
     if not os.path.isfile(group.RRE_results_file):
-        hhsearch(group.RRE_expalign_file,group.RRE_results_file,db_path,settings.cores)
+        hhsearch(settings,group.RRE_expalign_file,group.RRE_results_file,db_path,settings.cores)
     # Parse the results
-    settings.logger.log('Parsing results',1)
+    settings.logger.log('Parsing results',2)
     parse_hhpred_res(group,RRE_targets,settings,resubmit=True)
     
 def parse_hhpred_res(group,RRE_targets,settings,resubmit=False):
@@ -623,7 +629,7 @@ def find_RREfam_hits(groups,results,min_len=0,keyword='RREfam'):
     for group in groups:
         if group.name in results:
             domains_found = results[group.name]
-            # Get all the domains if they're longer than the minimum length, but only one hit per hmm(?)
+            # Get all the domains if they're longer than the minimum length, but only one hit per hmm
             all_domains = {}
             for domain in domains_found:
                 length = domain[2] - domain[1]
@@ -646,7 +652,7 @@ def run_hmm(groups,settings):
     
     # Now run hmmer
     if not os.path.isfile(tbl_out): #Reuse old results
-        hmmsearch(settings.fasta_file_all,settings.hmm_db,hmm_out,tbl_out,settings.hmm_evalue,cut=False,cores=settings.cores)
+        hmmsearch(settings.fasta_file_all,settings.hmm_db,hmm_out,tbl_out,settings,bitscore=settings.hmm_cutoff,cut=False,cores=settings.cores)
     
     # Parse the results
     results = parse_hmm_domtbl_hmmsearch(tbl_out)
@@ -654,14 +660,16 @@ def run_hmm(groups,settings):
     find_RRE_hits_hmm(groups,results,settings.hmm_minlen)
     
     
-def hmmsearch(infile,database,outfile,domtblout,evalue=False,cut=False,cores=1):
+def hmmsearch(infile,database,outfile,domtblout,settings,evalue=False,cut=False,bitscore=False,cores=1):
     commands = ['hmmsearch','--cpu',str(cores),'-o',outfile,'--domtblout',domtblout]
     if evalue:
         commands.extend(['-E',str(evalue)])
     elif cut:
         commands.extend(['--%s' %cut])
+    elif bitscore:
+        commands.extend(['-T',str(bitscore)])
     commands.extend([database,infile])
-    print(' '.join(commands))
+    settings.logger.log(' '.join(commands),1)
     call(commands)
     
 def write_results_summary(all_groups,outfile,mode,resubmit=False,hmm=False,regulators=False):
@@ -736,7 +744,7 @@ def write_results_summary(all_groups,outfile,mode,resubmit=False,hmm=False,regul
                 table_text += text
                 if nr_reg_found > max_reg_found:
                     max_reg_found = nr_reg_found
-        print('Max regs found: %i' %max_reg_found)
+        settings.logger.log('Max regs found: %i' %max_reg_found,2)
         for i in range(max_reg_found):
             header.extend(['Regulator name','Regulator start','Regulator end','Regulator e-value','Fraction of RRE overlapped'])   
         handle.write('\t'.join(header) + '\n')
@@ -841,7 +849,7 @@ def pipeline_worker(settings,queue,done_queue):
         outfile = group.results_file
         if not os.path.isfile(outfile) or settings_copy.overwrite_hhblits:
             logger.log('Process id %s running hhsearch' %(os.getpid()))
-            hhsearch(infile,outfile,db_path,1)
+            hhsearch(settings_copy,infile,outfile,db_path,1)
         # Parse the results
         parse_hhpred_res(group,RRE_targets,settings_copy,resubmit=False)
         if group.RRE_hit and settings_copy.resubmit:
@@ -856,7 +864,7 @@ def pipeline_resubmit_worker(settings,queue,done_queue):
     logger = Log(logfile,settings.verbosity)
     settings_copy = settings.new()
     settings_copy.logger = logger
-    logger.log('Starting process id (pipeline_resubmit_worker): %s'  %os.getpid())
+    logger.log('Starting process id (pipeline_resubmit_worker): %s'  %os.getpid(),2)
     RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
     db_path = settings.rre_database_path
     while True:
@@ -867,11 +875,11 @@ def pipeline_resubmit_worker(settings,queue,done_queue):
             continue
         if group == False:
             break
-        logger.log('Process id %s starting work on group %s' %(os.getpid(),group.name))
+        logger.log('Process id %s starting work on group %s' %(os.getpid(),group.name),2)
         resubmit_group(group,RRE_targets,settings_copy,1)
-        logger.log('Process id %s finished resubmitting' %os.getpid())
+        logger.log('Process id %s finished resubmitting' %os.getpid(),2)
         done_queue.put(group)
-    logger.log('Process %s exiting' %os.getpid())
+    logger.log('Process %s exiting' %os.getpid(),2)
 
 def count_alignment(group,resubmit=False):
     if resubmit:
@@ -939,7 +947,7 @@ def rrefam_main(settings,all_groups):
     write_fasta_single(settings,all_groups)
     # HMMER
     if not os.path.isfile(tbl_out): #Reuse old results
-        hmmsearch(settings.fasta_file_all,settings.rrefam_database,hmm_out,tbl_out,cores=settings.cores,cut='cut_tc')
+        hmmsearch(settings.fasta_file_all,settings.rrefam_database,hmm_out,tbl_out,settings,cores=settings.cores,bitscore=settings.rrefam_cutoff)
     # Parse
     results = parse_hmm_domtbl_hmmsearch(tbl_out)
     # Integrate into groups
@@ -973,7 +981,7 @@ def scan_regulators(settings,all_groups):
     
     # Now run hmmer
     if not os.path.isfile(hmm_file_tbl): #Reuse old results
-        hmmsearch(fasta_file_hits,settings.regulator_database,hmm_file_out,hmm_file_tbl,cores=settings.cores,cut='cut_tc')
+        hmmsearch(fasta_file_hits,settings.regulator_database,hmm_file_out,hmm_file_tbl,settings,cores=settings.cores,cut='cut_tc')
     
     # Parse the results
     results = parse_hmm_domtbl_hmmsearch(hmm_file_tbl)
@@ -995,7 +1003,7 @@ def determine_regulator_overlap(hmm_results,all_groups,settings):
             # Append to hit data
             # Do so for each of the analysis modes
             for scantype,locations in group.RRE_locations.items():
-                for hit in locations:
+                for hit in locations:  
                     start_hit,end_hit = locations[hit]
                     length_hit = end_hit - start_hit
                     
@@ -1009,6 +1017,8 @@ def determine_regulator_overlap(hmm_results,all_groups,settings):
                                 overlap = end_hmm - start_hit 
                             elif start_hmm > start_hit and end_hmm >= end_hit:
                                 overlap = end_hit - start_hmm
+                            elif start_hmm > start_hit and end_hmm < end_hit:
+                                overlap = end_hmm - start_hmm
                             fraction_overlap = float(overlap) / length_hit
                         if fraction_overlap >= settings.min_reg_overlap:
                             # Overlap
@@ -1070,7 +1080,7 @@ def parse_infiles(settings):
             settings.logger.log('No %s files found in folder %s' %(settings.intype,settings.infile),0)
             return {}
         else:
-            settings.logger.log('%i %s files found in folder %s' %(len(infile),settings.intype,settings.infile),0)
+            settings.logger.log('%i %s files found in folder %s' %(len(infile),settings.intype,settings.infile),1)
     else:
         settings.logger.log('No valid file or directory given',0)
         return {}
@@ -1263,7 +1273,7 @@ if __name__ == '__main__':
     configpath = 'config.ini'
     settings = parse_arguments(configpath)
     if settings.rrefinder_primary_mode == 'hhpred' and not settings.expand_database_path:
-        print('Using HHpred as initial mode for RREfinder requires a database. Please set the path in the config file')
+        print('Using HHpred as initial mode for RREfinder requires an HHblits database. Please set the path in the config file')
         exit()
     t0 = time.time()
     res = main(settings)
