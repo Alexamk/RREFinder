@@ -332,7 +332,7 @@ def make_gene_objects(seq_dict,settings):
     all_genes = []
     for gene,seq in seq_dict.items():
         gene = gene.replace(' ','_')
-        for char in '();:<>':
+        for char in '();:<>|/\\':
             gene = gene.replace(char,'')
         fasta_file = os.path.join(settings.fasta_folder,gene + '.fasta')
         results_file = os.path.join(settings.results_folder, '%s.hhr' %(gene))
@@ -549,6 +549,7 @@ def parse_hmm_domtbl(p):
 #                print protein_name,domain_found
             if '.' in domain_found:
                 domain_found = domain_found.rpartition('.')[0]
+            bitscore = tabs[13]
             domain_evalue = tabs[12]
             if 'e' in domain_evalue:
                 parts = domain_evalue.split('e')
@@ -564,7 +565,7 @@ def parse_hmm_domtbl(p):
                 pass
             if protein_name not in outd:
                 outd[protein_name] = []
-            outd[protein_name].append([domain_found,seq_start,seq_end,domain_evalue])
+            outd[protein_name].append([domain_found,seq_start,seq_end,domain_evalue,bitscore])
     return outd
     
 def parse_hmm_domtbl_hmmsearch(p):
@@ -584,6 +585,7 @@ def parse_hmm_domtbl_hmmsearch(p):
 #                print protein_name,domain_found
             if '.' in domain_found:
                 domain_found = domain_found.rpartition('.')[0]
+            bitscore = tabs[13]
             domain_evalue = tabs[12]
             if 'e' in domain_evalue:
                 parts = domain_evalue.split('e')
@@ -599,23 +601,23 @@ def parse_hmm_domtbl_hmmsearch(p):
                 pass
             if protein_name not in outd:
                 outd[protein_name] = []
-            outd[protein_name].append([domain_found,seq_start,seq_end,domain_evalue])
+            outd[protein_name].append([domain_found,seq_start,seq_end,domain_evalue,bitscore])
     return outd
 
 def find_RRE_hits_hmm(groups,results,min_len=0,keyword='RRE'):
     for group in groups:
         if group.name in results:
             domains_found = results[group.name]
-            # Get the domain with the lowest e-value
-            lowest_ev = 100
+            # Get the domain with the highest bitscore
+            highest_bitscore = 0
             best_domain = None
             for domain in domains_found:
                 length = domain[2] - domain[1]
                 if length < min_len:
                     continue
-                ev = domain[-1]                
-                if ev < lowest_ev:
-                    lowest_ev = ev
+                bitscore = domain[-1]                
+                if bitscore > highest_bitscore:
+                    highest_bitscore = bitscore
                     best_domain = domain
             if best_domain:
                 setattr(group,'%s_hit' %keyword,True)
@@ -699,16 +701,16 @@ def write_results_summary(all_groups,outfile,mode,resubmit=False,hmm=False,regul
         else:
             for hit,domain_data in data.items():
                 if gene:
-                    out = [group.name,gene,hit,str(domain_data[2]),str(domain_data[0]),str(domain_data[1])]
+                    out = [group.name,gene,hit,str(domain_data[2]),str(domain_data[3]),str(domain_data[0]),str(domain_data[1])]
                 else:
-                    out = ['N\\A',group.name,hit,str(domain_data[2]),str(domain_data[0]),str(domain_data[1])]
+                    out = ['N\\A',group.name,hit,str(domain_data[2]),str(domain_data[3]),str(domain_data[0]),str(domain_data[1])]
                 
-                if regulators and len(domain_data) > 3:
-                    nr_reg_found = len(domain_data[3])
+                if regulators and len(domain_data) > 4:
+                    nr_reg_found = len(domain_data[4])
                     if nr_reg_found > max_reg_found:
                         max_reg_found = nr_reg_found
                     out.append(str(nr_reg_found))
-                    for reg in domain_data[3]:
+                    for reg in domain_data[4]:
                         out.extend([str(i) for i in reg])
                 text += '\t'.join(out) + '\n'
 
@@ -718,7 +720,7 @@ def write_results_summary(all_groups,outfile,mode,resubmit=False,hmm=False,regul
         if not hmm:
             header = ['Group name','Gene name','Hit name','Probability','E-value','P-value','Score','SS','Columns','RRE start', 'RRE end']
         else:
-            header = ['Group name','Gene name','Domain name','E-value','Start','End']
+            header = ['Group name','Gene name','Domain name','E-value','Bitscore','Start','End']
         if regulators:
             header.extend(['Regulators overlapping'])
             
@@ -974,7 +976,10 @@ def scan_regulators(settings,all_groups):
         if settings.mode == 'both' or settings.mode == 'rrefam':
             if group.RREfam_hit:
                 hits.append(group)
-                
+    
+    if len(hits) == 0:
+        settings.logger.log('No RRE hits found - not scanning for regulators',1)            
+        return
     with open(fasta_file_hits,'w') as handle:
         for group in hits:
             handle.write(group.fasta)
@@ -1034,7 +1039,7 @@ def determine_regulator_overlap(hmm_results,all_groups,settings):
                         
                     elif scantype == 'RREfam':
                         hittype,RRE_data = group.RREfam_data
-                        
+                    # Display three regulators max
                     RRE_data[hit].append(overlaps_to_append[0:3])
            
                         
@@ -1277,13 +1282,14 @@ if __name__ == '__main__':
         exit()
     t0 = time.time()
     res = main(settings)
-    hits = [i for i in res if i.RRE_hit]
     t1 = time.time()
     settings.logger.log('Finished. Total time: %.2f seconds (on %i cores)' %((t1-t0),settings.cores),1)
-    settings.logger.log('Hits found: %i out of %i' %(len([i for i in res if i.RRE_hit]),len(res)),1)
-    if settings.resubmit:
-        settings.logger.log('Resubmit hits found: %i out of %i' %(len([i for i in res if i.RRE_hit and i.RRE_resubmit_hit]),len(res)),1)
-
+    if settings.mode == 'rrefinder' or settings.mode == 'both':
+        settings.logger.log('RREfinder hits found: %i out of %i' %(len([i for i in res if i.RRE_hit]),len(res)),1)
+        if settings.resubmit:
+            settings.logger.log('RREfinder resubmit hits found: %i out of %i' %(len([i for i in res if i.RRE_hit and i.RRE_resubmit_hit]),len(res)),1)
+    if settings.mode == 'rrefam' or settings.mode == 'both':
+        settings.logger.log('RREFam hits found: %i out of %i' %(len([i for i in res if i.RREfam_hit]),len(res)),1)
 
 
 
