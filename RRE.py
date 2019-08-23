@@ -896,7 +896,7 @@ def count_alignment(group,resubmit=False):
     return(int(c/2))
         
 
-def rrefinder_main(settings,all_groups):
+def rrefinder_main(settings,RRE_targets,all_groups):
     # RREfinder main function
     
     # For hhpred, it is more efficient to split up all the sequences individually, which is done here. Each thread works on a single sequence 
@@ -1158,7 +1158,7 @@ def main(settings):
     settings.logger.log('Continuing with %i queries, %i of which are groups of genes' %(len(all_groups), len([g for g in all_groups if g.group])),1)
     
     if settings.mode == 'rrefinder' or settings.mode == 'both':
-        all_groups = rrefinder_main(settings,all_groups)
+        all_groups = rrefinder_main(settings,RRE_targets,all_groups)
     if settings.mode == 'rrefam' or settings.mode == 'both':
         rrefam_main(settings,all_groups)
     if settings.regulator_filter:
