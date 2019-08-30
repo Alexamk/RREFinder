@@ -330,7 +330,12 @@ def read_hhr(f):
 
 def make_gene_objects(seq_dict,settings):
     all_genes = []
+    skipped = []
     for gene,seq in seq_dict.items():
+        if settings.max_length_prot and len(seq) > settings.max_length_prot:
+            settings.logger.log('Not analyzing gene %s (too long)' %(gene),2)
+            skipped.append(gene)
+            continue
         gene = gene.replace(' ','_')
         for char in '();:<>|/\\':
             gene = gene.replace(char,'')
@@ -351,7 +356,7 @@ def make_gene_objects(seq_dict,settings):
             RRE_expalign_file = os.path.join(settings.fasta_folder,gene+'_RRE_expalign.a3m')
             gene_obj.setattrs(RRE_fasta_file=RRE_fasta_file,RRE_results_file=RRE_results_file,RRE_expalign_file=RRE_expalign_file)
         
-    return all_genes
+    return all_genes,skipped
 
 def make_group_objects(groups,seq_dict,fasta_folder,results_folder,settings):
     all_groups = []
@@ -549,7 +554,7 @@ def parse_hmm_domtbl(p):
 #                print protein_name,domain_found
             if '.' in domain_found:
                 domain_found = domain_found.rpartition('.')[0]
-            bitscore = tabs[13]
+            bitscore = float(tabs[13])
             domain_evalue = tabs[12]
             if 'e' in domain_evalue:
                 parts = domain_evalue.split('e')
@@ -585,7 +590,7 @@ def parse_hmm_domtbl_hmmsearch(p):
 #                print protein_name,domain_found
             if '.' in domain_found:
                 domain_found = domain_found.rpartition('.')[0]
-            bitscore = tabs[13]
+            bitscore = float(tabs[13])
             domain_evalue = tabs[12]
             if 'e' in domain_evalue:
                 parts = domain_evalue.split('e')
@@ -604,7 +609,7 @@ def parse_hmm_domtbl_hmmsearch(p):
             outd[protein_name].append([domain_found,seq_start,seq_end,domain_evalue,bitscore])
     return outd
 
-def find_RRE_hits_hmm(groups,results,min_len=0,keyword='RRE'):
+def find_RRE_hits_hmm(groups,results,cutoff,min_len=0,keyword='RRE'):
     for group in groups:
         if group.name in results:
             domains_found = results[group.name]
@@ -615,11 +620,11 @@ def find_RRE_hits_hmm(groups,results,min_len=0,keyword='RRE'):
                 length = domain[2] - domain[1]
                 if length < min_len:
                     continue
-                bitscore = domain[-1]                
+                bitscore = float(domain[-1])                
                 if bitscore > highest_bitscore:
                     highest_bitscore = bitscore
                     best_domain = domain
-            if best_domain:
+            if best_domain and highest_bitscore >= cutoff:
                 setattr(group,'%s_hit' %keyword,True)
                 setattr(group,'%s_data' %keyword, ['hmm',{best_domain[0]:best_domain[1:]}])
             else:
@@ -627,7 +632,7 @@ def find_RRE_hits_hmm(groups,results,min_len=0,keyword='RRE'):
         else:
             setattr(group,'%s_hit' %keyword,False)
    
-def find_RREfam_hits(groups,results,min_len=0,keyword='RREfam'):
+def find_RREfam_hits(groups,results,cutoff,min_len=0,keyword='RREfam'):
     for group in groups:
         if group.name in results:
             domains_found = results[group.name]
@@ -636,6 +641,9 @@ def find_RREfam_hits(groups,results,min_len=0,keyword='RREfam'):
             for domain in domains_found:
                 length = domain[2] - domain[1]
                 if length < min_len:
+                    continue
+                bitscore = domain[4]
+                if bitscore < cutoff:
                     continue
                 all_domains[domain[0]] = domain[1:]     
             if len(all_domains) > 0:
@@ -659,7 +667,7 @@ def run_hmm(groups,settings):
     # Parse the results
     results = parse_hmm_domtbl_hmmsearch(tbl_out)
     # Interpret the results and assign RRE hits
-    find_RRE_hits_hmm(groups,results,settings.hmm_minlen)
+    find_RRE_hits_hmm(groups,results,settings.hmm_cutoff,settings.hmm_minlen)
     
     
 def hmmsearch(infile,database,outfile,domtblout,settings,evalue=False,cut=False,bitscore=False,cores=1):
@@ -953,9 +961,7 @@ def rrefam_main(settings,all_groups):
     # Parse
     results = parse_hmm_domtbl_hmmsearch(tbl_out)
     # Integrate into groups
-    find_RREfam_hits(all_groups,results,min_len=settings.rrefam_minlen,keyword='RREfam')
-    
-
+    find_RREfam_hits(all_groups,results,settings.rrefam_cutoff,min_len=settings.rrefam_minlen,keyword='RREfam')
 
 def scan_regulators(settings,all_groups):
     # Get the fasta file of all relevant hits
@@ -1151,12 +1157,12 @@ def main(settings):
         groups = read_mcl(mcl_file)
         all_groups,genes_seen = make_group_objects(groups,seq_dict,fasta_folder,results_folder,settings)
         remaining_seq_dict = dict([(gene,seq_dict[gene]) for gene in seq_dict if gene not in genes_seen])
-        remaining_groups = make_gene_objects(remaining_seq_dict,settings)
+        remaining_groups,skipped_genes = make_gene_objects(remaining_seq_dict,settings)
         all_groups += remaining_groups
     else:
-        all_groups = make_gene_objects(seq_dict,settings)
+        all_groups,skipped_genes = make_gene_objects(seq_dict,settings)
     settings.logger.log('Continuing with %i queries, %i of which are groups of genes' %(len(all_groups), len([g for g in all_groups if g.group])),1)
-    
+    settings.logger.log('Skipped %i genes' %(len(skipped_genes)),2)
     if settings.mode == 'rrefinder' or settings.mode == 'both':
         all_groups = rrefinder_main(settings,RRE_targets,all_groups)
     if settings.mode == 'rrefam' or settings.mode == 'both':
