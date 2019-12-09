@@ -336,6 +336,7 @@ def make_gene_objects(seq_dict,settings):
             settings.logger.log('Not analyzing gene %s (too long)' %(gene),2)
             skipped.append(gene)
             continue
+        org_name = gene
         gene = gene.replace(' ','_')
         for char in '();:<>|/\\':
             gene = gene.replace(char,'')
@@ -343,7 +344,7 @@ def make_gene_objects(seq_dict,settings):
         results_file = os.path.join(settings.results_folder, '%s.hhr' %(gene))
         fasta = '>%s\n%s\n' %(gene,seq)
         gene_obj = Container()
-        gene_obj.setattrs(fasta_file=fasta_file,results_file=results_file,fasta=fasta,name=gene,group=False)
+        gene_obj.setattrs(fasta_file=fasta_file,results_file=results_file,fasta=fasta,name=gene,group=False,org_name=org_name)
         if settings.mode != 'rrefam' and settings.rrefinder_primary_mode == 'hhpred':
             exp_alignment_file = os.path.join(settings.fasta_folder,'%s_expalign.a3m' %gene)
             gene_obj.exp_alignment_file = exp_alignment_file
@@ -695,7 +696,7 @@ def write_results_summary(all_groups,outfile,mode,resubmit=False,hmm=False,regul
                     out = [group.name,gene,hit] + [str(i) for i in res[0:6]]
                 else:
                     # Group is actually a gene
-                    out = ['N\\A',group.name,hit] + [str(i) for i in res[0:6]]
+                    out = ['N\\A',group.org_name,hit] + [str(i) for i in res[0:6]]
                 out.extend( res[6].split('-') )
                 if regulators and len(res) > 8:
                     # Regulator overlap found
@@ -711,7 +712,7 @@ def write_results_summary(all_groups,outfile,mode,resubmit=False,hmm=False,regul
                 if gene:
                     out = [group.name,gene,hit,str(domain_data[2]),str(domain_data[3]),str(domain_data[0]),str(domain_data[1])]
                 else:
-                    out = ['N\\A',group.name,hit,str(domain_data[2]),str(domain_data[3]),str(domain_data[0]),str(domain_data[1])]
+                    out = ['N\\A',group.org_name,hit,str(domain_data[2]),str(domain_data[3]),str(domain_data[0]),str(domain_data[1])]
                 
                 if regulators and len(domain_data) > 4:
                     nr_reg_found = len(domain_data[4])
