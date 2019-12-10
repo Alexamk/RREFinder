@@ -43,7 +43,7 @@ def gbk_to_dict(all_seqs):
             if feature.type == 'CDS':
                 name = contig_id
                 name += '_%s-%s' %(feature.location.start,feature.location.end)
-                for item in ['gene','locus_tag','product_id']:
+                for item in ['gene','locus_tag','protein_id']:
                     if item in feature.qualifiers:
                         name += '_%s' %(feature.qualifiers[item][0])
                 if 'translation' in feature.qualifiers:
@@ -337,8 +337,9 @@ def make_gene_objects(seq_dict,settings):
             skipped.append(gene)
             continue
         gene = gene.replace(' ','_')
-        for char in '();:<>|/\\':
+        for char in '();:<>|/\\"':
             gene = gene.replace(char,'')
+        gene = gene.replace("'",'')
         fasta_file = os.path.join(settings.fasta_folder,gene + '.fasta')
         results_file = os.path.join(settings.results_folder, '%s.hhr' %(gene))
         fasta = '>%s\n%s\n' %(gene,seq)
