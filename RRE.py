@@ -255,10 +255,12 @@ def add_ss(group,settings,resubmit=False,remove=False):
             cmds = ['addss.pl',infile,newfile,'-a3m']
             settings.logger.log(' '.join(cmds),2)
             p = Popen(cmds,stdout=PIPE,stderr=PIPE)
-            p.wait()
-            stdout = p.stdout.read()
+            stdout,stderr = p.communicate()
+            if type(stdout) == bytes:
+                stdout = str(stdout, 'utf-8')
+            if type(stderr) == bytes:
+                stderr = str(stderr, 'utf-8')
             settings.logger.log(stdout,2)
-            stderr = p.stderr.read()
             settings.logger.log(stderr,2)
         if resubmit:
             group.RRE_expalign_file = newfile
@@ -915,7 +917,7 @@ def rrefinder_main(settings,RRE_targets,all_groups):
     if settings.rrefinder_primary_mode == 'hmm':
         run_hmm(all_groups,settings)
         if settings.resubmit:
-            if int(settings.cores) < len(all_groups) and int(settings.cores) > 1:
+            if int(settings.cores) < len([i for i in all_groups if i.RRE_hit]) and int(settings.cores) > 1:
                 # Resubmit with pipeline operator if multiple cores are used and the amount of cores is smaller than the amount of jobs
                 pos_groups,_ = pipeline_operator([i for i in all_groups if i.RRE_hit],settings,pipeline_resubmit_worker)
                 all_groups = [i for i in all_groups if not i.RRE_hit] + pos_groups
