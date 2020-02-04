@@ -38,17 +38,17 @@ def parse_genbank(infile):
     file_dict = {}
     if type(infile) == list:
         for item in infile:
-            all_seqs = open_genbank(path)
+            all_seqs = open_genbank(item)
             seq_dict,data_dict = gbk_to_dict(all_seqs)
             final_seq_dict.update(seq_dict)
             final_data_dict.update(data_dict)
             file_dict[item] = all_seqs
     else:
-        all_seqs = open_genbank(path)
+        all_seqs = open_genbank(infile)
         seq_dict,data_dict = gbk_to_dict(all_seqs)
         final_seq_dict.update(seq_dict)
         final_data_dict.update(data_dict)
-        file_dict[item] = all_seqs
+        file_dict[infile] = all_seqs
     return final_seq_dict,final_data_dict,file_dict
         
 
@@ -374,7 +374,7 @@ def make_gene_objects(parsed_data_dict,settings):
         gene_obj.setattrs(fasta_file=fasta_file,results_file=results_file,fasta=fasta,name=gene,group=False,\
                           org_name=org_name)
                           
-        if 'data_dict' in parsed_data_dict:
+        if parsed_data_dict['data_dict'] != {}:
             # Only for genbank files
             data_dict = parsed_data_dict['data_dict']
             data = data_dict[org_name]
