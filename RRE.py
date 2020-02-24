@@ -15,23 +15,6 @@ from subprocess import call, Popen, PIPE
 
 from multiprocessing import Process, Queue
 
-#TODO
-#Read in antiSMASH results x 
-#Update the .gbk (in general, pretty useful)
-#Update the output file - add in antiSMASH results x 
-#Remove the old grouping system x
-
-#def parse_genbank(path,final_seq_dict={},final_data_dict):
-#    if type(path) == list:
-#        for item in path:
-#            final_seq_dict,final_data_dict = parse_genbank(item,final_seq_dict,final_data_dict)
-#    else:
-#        all_seqs = open_genbank(path)
-#        seq_dict,data_dict = gbk_to_dict(all_seqs)
-#        final_seq_dict.update(seq_dict)
-#        final_data_dict.update(data_dict)
-#    return final_seq_dict,final_data_dict
-
 def parse_genbank(infile):
     final_seq_dict = {}
     final_data_dict = {}
@@ -98,7 +81,7 @@ def find_antismash_clusters(all_seqs,req_type=False):
                 quals = feature.qualifiers
                 cluster_type = quals['product'][0]
                 if req_type:
-                    # Only parse of the required types
+                    # Only parse clusters of the required types
                     # Only used for now with the RiPP types
                     cluster_types = cluster_type.split('-')
                     if not any([c in req_type for c in cluster_types]):
@@ -536,42 +519,6 @@ def resubmit_all(groups,RRE_targets,settings):
         if group.RRE_hit:
             resubmit_group(group,RRE_targets,settings,settings.cores)
 
-def parse_hmm_domtbl(p):
-    # Parse per domain found
-    # Sort out overlap later
-    with open(p) as f:
-        outd = {}
-        for _ in range(3):
-            l = f.readline()
-        for l in f:
-            if l.startswith('#'):
-                continue
-            tabs = l.strip().split(' ')
-            tabs = [tab for tab in tabs if tab != '']
-            protein_name = tabs[3]
-            domain_found = tabs[0]
-#                print protein_name,domain_found
-            if '.' in domain_found:
-                domain_found = domain_found.rpartition('.')[0]
-            bitscore = float(tabs[13])
-            domain_evalue = tabs[12]
-            if 'e' in domain_evalue:
-                parts = domain_evalue.split('e')
-#                    print domain_evalue,parts
-                domain_evalue = float(parts[0])*10**int(parts[1])
-            else:
-                domain_evalue = float(domain_evalue)
-#                print(tabs[17],tabs[18])
-            seq_start = int(tabs[17])
-            seq_end = int(tabs[18])
-            if seq_start > seq_end:
-#                print 'Seq start after end: %s' %protein_name
-                pass
-            if protein_name not in outd:
-                outd[protein_name] = []
-            outd[protein_name].append([domain_found,seq_start,seq_end,domain_evalue,bitscore])
-    return outd
-    
 def parse_hmm_domtbl_hmmsearch(p):
     # Parse per domain found
     # Sort out overlap later
@@ -1342,7 +1289,7 @@ def parse_arguments(configpath):
     return settings
 
 if __name__ == '__main__':
-    configpath = 'config.ini'
+    configpath = os.path.join(os.path.join(os.path.dirname(__file__),'config.ini'))
     settings = parse_arguments(configpath)
     if settings.rrefinder_primary_mode == 'hhpred' and not settings.expand_database_path:
         print('Using HHpred as initial mode for RREfinder requires an HHblits database. Please set the path in the config file')
