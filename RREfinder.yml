@@ -1,0 +1,13 @@
+name: RREfinder
+channels:
+  - biocore
+  - bioconda
+  - r
+  - defaults
+  - conda-forge
+dependencies:
+  - blast-legacy=2.2.26=2
+  - hmmer=3.1b2=0
+  - psipred=4.01=1
+prefix: /home/NIOO.INT/victorc/.conda/envs/RREfinder
+
