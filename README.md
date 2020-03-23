@@ -3,6 +3,7 @@ Bioinformatic application for the detection of RREs in protein sequences of inte
 
 # Download guide:
 1) Clone the repository
+
 For exploratory mode:
 2) Install Git LFS (https://developer.lsst.io/v/DM-7539/tools/git_lfs.html) and setup git LFS (option 1, for read-only, is sufficient)
 3) Pull the databases with git lfs pull
@@ -35,9 +36,12 @@ Then reboot the terminal or rerun the file (source ~/.bashrc)
 2) You should see a section looking like this:
       
 ##############################################################################################
-#PLEASE COMPLETE THE PATHS ... TO PSIPRED AND OLD-STYLE BLAST (NOT BLAST+) (NEEDED FOR PSIPRED) 
+#PLEASE COMPLETE THE PATHS ... TO PSIPRED AND OLD-STYLE BLAST (NOT BLAST+) (NEEDED FOR PSIPRED)
+
 #our $execdir = ".../psipred/bin";         # path to PSIPRED V2 binaries
+
 #our $datadir = ".../psipred/data";        # path to PSIPRED V2 data files
+
 #our $ncbidir = ".../blast/bin";           # path to NCBI binaries (for PSIPRED in addss.pl)
 
 3) Complete the paths
