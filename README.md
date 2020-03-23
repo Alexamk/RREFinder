@@ -1,13 +1,13 @@
 # RREFinder
 Bioinformatic application for the detection of RREs in protein sequences of interest
 
-Download guide:
+# Download guide:
 1) Clone the repository
 For exploratory mode:
 2) Install Git LFS (https://developer.lsst.io/v/DM-7539/tools/git_lfs.html) and setup git LFS (option 1, for read-only, is sufficient)
 3) Pull the databases with git lfs pull
 
-Installation guide:
+# Installation guide:
 
 Install the included conda environment with "conda env create -f RREfinder.yml"
 Or make sure the following packages/programs are installed and in your path
@@ -35,7 +35,7 @@ Install the HHsuite V3 or above (https://github.com/soedinglab/hh-suite)
       2) You should see a section looking like this:
       
 ##############################################################################################
-# PLEASE COMPLETE THE PATHS ... TO PSIPRED AND OLD-STYLE BLAST (NOT BLAST+) (NEEDED FOR PSIPRED) 
+#PLEASE COMPLETE THE PATHS ... TO PSIPRED AND OLD-STYLE BLAST (NOT BLAST+) (NEEDED FOR PSIPRED) 
 #our $execdir = ".../psipred/bin";         # path to PSIPRED V2 binaries
 #our $datadir = ".../psipred/data";        # path to PSIPRED V2 data files
 #our $ncbidir = ".../blast/bin";           # path to NCBI binaries (for PSIPRED in addss.pl)
@@ -57,14 +57,20 @@ Install the HHsuite V3 or above (https://github.com/soedinglab/hh-suite)
          
 RREfinder is now ready for use!
 
-Usage guide.
+# Usage guide
+
+RREFinder accepts both .fasta files and .genbank files. 
+Alternatively, you can use --antismash RiPP and let the --infile point to a .final.gbk file from antiSMASH analysis. 
+This way all the antiSMASH RiPP gene clusters will be analyzed.
 
 python RRE.py -i my_infile.gbk project_name
 or 
 python RRE.py -i my_infile.fasta -t fasta project_name
+or 
+python RRE.py -i antismash_output.final.gbk --antismash RiPP project_name
+
 
 Output can be found under output/project_name
-
 Both modes are used by default. To use only precision or exploratory mode, use the -m tag. 
 
 python RRE.py -i my_infile.gbk -m precision project_name
