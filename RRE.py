@@ -1265,10 +1265,10 @@ def parse_arguments(configpath):
     parser.add_argument('--regulator_filter',help='Filter out found regulatory/HTH pfams',default=False,action='store_true')
     parser.add_argument('--update_genbank',help='Make a new genbank file with the RRE hits',default=False,action='store_true')
     
-    rrefinder = parser.add_argument_group('RREfinder settings')
+    rrefinder = parser.add_argument_group('Exploratory settings')
+    rrefinder.add_argument('--rrefinder_min_prob',help='The minimum HHpred predicted probability for a hit to be considered significant (reads from config file if none is given)')
     rrefinder.add_argument('--rrefinder_primary_mode',help='Choose from either hhpred or hmm for the initial scan (default: hmm)',choices=['hmm','hhpred'],default='hmm')
     rrefinder.add_argument('--no_resubmit',help='Do not resubmit found RRE hits with the resubmit database', default=True, action='store_false',dest='resubmit')
-    rrefinder.add_argument('--rrefinder_min_prob',help='The minimum HHpred predicted probability for a hit to be considered significant (reads from config file if none is given)')
     rrefinder.add_argument('--addss',help=argparse.SUPPRESS, type=int)
     rrefinder.add_argument('--group_genes',help=argparse.SUPPRESS, default=False,action='store_true')
 
