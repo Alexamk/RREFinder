@@ -22,17 +22,17 @@ For exploratory mode, please follow the instructions below.
 Install the HHsuite V3 or above (https://github.com/soedinglab/hh-suite)
     - Make sure the following parameters are set (which is part of their recommended installation)
     
-      1) $HHLIB is set to the folder containing the HHsuite tool
-      2) The binary files and the script files are in your path 
-        (i.e. if you open a terminal and type "hhblits" or "addss.pl", both should be recognized commands)
-        Easiest way to do this is to modify the .bashrc file, and add a few extra lines:
-        export HHLIB="/path/to/HHsuite"
-        export PATH="$HHLIB/bin:$HHLIB/scripts:$PATH"
-        Then reboot the terminal or rerun the file (source ~/.bashrc)
-       
-    - Configure the HHsuite paths:
-      1) Find the file HHPaths.pm in the scripts folder 
-      2) You should see a section looking like this:
+1) $HHLIB is set to the folder containing the HHsuite tool
+2) The binary files and the script files are in your path 
+(i.e. if you open a terminal and type "hhblits" or "addss.pl", both should be recognized commands)
+Easiest way to do this is to modify the .bashrc file, and add a few extra lines:
+export HHLIB="/path/to/HHsuite"
+export PATH="$HHLIB/bin:$HHLIB/scripts:$PATH"
+Then reboot the terminal or rerun the file (source ~/.bashrc)
+
+- Configure the HHsuite paths:
+1) Find the file HHPaths.pm in the scripts folder 
+2) You should see a section looking like this:
       
 ##############################################################################################
 #PLEASE COMPLETE THE PATHS ... TO PSIPRED AND OLD-STYLE BLAST (NOT BLAST+) (NEEDED FOR PSIPRED) 
@@ -40,20 +40,20 @@ Install the HHsuite V3 or above (https://github.com/soedinglab/hh-suite)
 #our $datadir = ".../psipred/data";        # path to PSIPRED V2 data files
 #our $ncbidir = ".../blast/bin";           # path to NCBI binaries (for PSIPRED in addss.pl)
 
-      3) Complete the paths
-         The $execdir and the $ncbidir need to contain the psipred and the blastpgp binaries, respectively.
-         The easiest way is to see where your psipred binary is located (which psipred), and point to that folder.
-         In the conda package, the ncbidir is usually the same thing, as all the binaries are usually in the same folder.
-         e.g. /path/to/conda/envs/RREfinder/bin
-         
-         For the $datadir, you need to find where the psipred data is stored in the conda package.
-         This depends on your conda setup. Example locations include: 
-         /path/to/conda/envs/RREfinder/share/psipred_4.01/data
-         /path/to/conda/pkgs/psipred_4.01/share/psipred_4.01/data
-         The data folder should contain seven files all named weights.dat or some variation of that name.
-         
-         Alternatively, if you manually install PSIPRED, let the execdir point to the folder containing the psipred binary,
-         the datadir to the folder containing the psipred data and the ncbidir to the folder containing the legacy BLAST binary (blastpgp)
+3) Complete the paths
+ The $execdir and the $ncbidir need to contain the psipred and the blastpgp binaries, respectively.
+ The easiest way is to see where your psipred binary is located (which psipred), and point to that folder.
+ In the conda package, the ncbidir is usually the same thing, as all the binaries are usually in the same folder.
+ e.g. /path/to/conda/envs/RREfinder/bin
+
+ For the $datadir, you need to find where the psipred data is stored in the conda package.
+ This depends on your conda setup. Example locations include: 
+ /path/to/conda/envs/RREfinder/share/psipred_4.01/data
+ /path/to/conda/pkgs/psipred_4.01/share/psipred_4.01/data
+ The data folder should contain seven files all named weights.dat or some variation of that name.
+
+ Alternatively, if you manually install PSIPRED, let the execdir point to the folder containing the psipred binary,
+ the datadir to the folder containing the psipred data and the ncbidir to the folder containing the legacy BLAST binary (blastpgp)
          
 RREfinder is now ready for use!
 
