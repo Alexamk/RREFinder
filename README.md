@@ -87,3 +87,24 @@ or
 
 You can also specify a range of other options, such as number of cores to use, or the bitscore cutoffs.
 Use 'python RRE.py -h'  to see a list of options.
+
+# Use RREFinder as a wrapper around the original way to detect RREs (HHPred) (Advanced)
+You can also use RREFinder as a way to run the HHPred pipeline in a commandline fashion, just to detect RREs. This provides analogous results as when submitting queries online in the HHPred pipeline. However, RRE regions are automatically resubmitted in the same pipeline, to verify them. This requires downloading of the uniclust30 database (https://uniclust.mmseqs.com/).
+Warning! This process is typically very time-consuming, and not typically suitable for large-scale analysis.
+
+HHPred is used first to find low-probability hits (<= 40). The region with flanking regions are extracted, and resubmitted  using the same pipeline, using a high-probability cutoff (>= 90).
+
+Setup:
+1) Make sure the pipeline is prepared for exploratory mode as described above.
+2) Download the uniclust30 database from https://uniclust.mmseqs.com/. It is recommended to store the database on an SSD drive.
+3) Point to the database in the config file, with both the expand_database and the resubmit_database variables
+
+        resubmit_database=path/to/uniclust30
+        expand_database=path/to/uniclust30
+        
+3) Run RRE.py with the --rrefinder-primary-mode flag set to hhpred. E.g.
+
+        python RRE.py -i my_infile.gbk -m exploratory --rrefinder-primary-mode hhpred
+
+
+
