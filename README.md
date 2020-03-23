@@ -49,12 +49,15 @@ Then reboot the terminal or rerun the file (source ~/.bashrc)
 
  For the $datadir, you need to find where the psipred data is stored in the conda package.
  This depends on your conda setup. Example locations include: 
- /path/to/conda/envs/RREfinder/share/psipred_4.01/data
- /path/to/conda/pkgs/psipred_4.01/share/psipred_4.01/data
+ 
+    /path/to/conda/envs/RREfinder/share/psipred_4.01/data
+ 
+    /path/to/conda/pkgs/psipred_4.01/share/psipred_4.01/data
+ 
  The data folder should contain seven files all named weights.dat or some variation of that name.
 
- Alternatively, if you manually install PSIPRED, let the execdir point to the folder containing the psipred binary,
- the datadir to the folder containing the psipred data and the ncbidir to the folder containing the legacy BLAST binary (blastpgp)
+Alternatively, if you manually install PSIPRED, let the execdir point to the folder containing the psipred binary,
+the datadir to the folder containing the psipred data and the ncbidir to the folder containing the legacy BLAST binary (blastpgp)
          
 RREfinder is now ready for use!
 
@@ -82,4 +85,4 @@ or
     python RRE.py -i my_infile.fasta -t fasta -m exploratory project_name
 
 You can also specify a range of other options, such as number of cores to use, or the bitscore cutoffs.
-Use "python RRE.py -h"  to see a list of options.
+Use 'python RRE.py -h'  to see a list of options.
