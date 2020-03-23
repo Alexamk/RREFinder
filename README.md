@@ -22,12 +22,12 @@ At this point you can already run RREFinder in precision mode. Use python RRE.py
 
 For exploratory mode, please follow the instructions below.
 
-Install the HHsuite V3 (https://github.com/soedinglab/hh-suite)
+1) Install the HHsuite V3 (https://github.com/soedinglab/hh-suite)
 
-Make sure the following parameters are set (which is part of their recommended installation)
+2) Make sure the following parameters are set (which is part of their recommended installation)
     
-1) $HHLIB is set to the folder containing the HHsuite tool
-2) The binary files and the script files are in your path 
+- $HHLIB is set to the folder containing the HHsuite tool
+- The binary files and the script files are in your path 
 (i.e. if you open a terminal and type "hhblits" or "addss.pl", both should be recognized commands)
 Easiest way to do this is to modify the .bashrc file, and add a few extra lines:
 
@@ -36,9 +36,8 @@ Easiest way to do this is to modify the .bashrc file, and add a few extra lines:
 
 Then reboot the terminal or rerun the file (source ~/.bashrc)
 
-Configure the HHsuite paths
-1) Find the file HHPaths.pm in the scripts folder 
-2) You should see a section looking like this:
+3) Configure the HHsuite paths
+Find the file HHPaths.pm in the HHsuite scripts folder 
 
         ##############################################################################################
         #PLEASE COMPLETE THE PATHS ... TO PSIPRED AND OLD-STYLE BLAST (NOT BLAST+) (NEEDED FOR PSIPRED)
@@ -46,23 +45,25 @@ Configure the HHsuite paths
         #our $datadir = ".../psipred/data";        # path to PSIPRED V2 data files
         #our $ncbidir = ".../blast/bin";           # path to NCBI binaries (for PSIPRED in addss.pl)
 
-3) Complete the paths
+Complete these paths. The $execdir and the $ncbidir need to contain the psipred and the blastpgp binaries, respectively.
+The see where a binary is located use 
+        
+        which psipred
+        which blastpgp
+        
+within the active environment. Use the folder, not the binary itself.
+In the conda package, the two folders are likely the same.
 
-The $execdir and the $ncbidir need to contain the psipred and the blastpgp binaries, respectively.
-The easiest way is to see where your psipred binary is located (use 'which psipred'), and point to that folder.
-In the conda package, the ncbidir is usually the same thing, as all the binaries are usually in the same folder.
-e.g. /path/to/conda/envs/RREfinder/bin. 
-
-For the $datadir, you need to find where the psipred data is stored in the conda package.
+For the $datadir, you need to find where the psipred data is stored within the conda package.
 This depends on your conda setup. Example locations include: 
  
     /path/to/conda/envs/RREfinder/share/psipred_4.01/data
  
     /path/to/conda/pkgs/psipred_4.01/share/psipred_4.01/data
  
- The data folder should contain seven files all named weights.dat or some variation of that name.
+The data folder should contain seven files all named weights.dat or some variation of that name.
 
-Alternatively, if you manually install PSIPRED, let the execdir point to the folder containing the psipred binary,
+If you manually install PSIPRED, let the execdir point to the folder containing the psipred binary,
 the datadir to the folder containing the psipred data and the ncbidir to the folder containing the legacy BLAST binary (blastpgp)
          
 RREfinder is now ready for use in both modes!
