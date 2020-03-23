@@ -13,9 +13,10 @@ For exploratory mode:
 
 Install the included conda environment with "conda env create -f RREfinder.yml"
 Or make sure the following packages/programs are installed and in your path
-    - HMMer
-    - PSIPRED
-    - python package Biopython
+
+- HMMer
+- PSIPRED
+- python package Biopython
     
 At this point you can already run RREFinder in precision mode. Use python RRE.py with -m precision or --mode precision to do so.
 
