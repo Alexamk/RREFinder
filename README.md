@@ -22,18 +22,21 @@ At this point you can already run RREFinder in precision mode. Use python RRE.py
 
 For exploratory mode, please follow the instructions below.
 
-Install the HHsuite V3 or above (https://github.com/soedinglab/hh-suite)
-    - Make sure the following parameters are set (which is part of their recommended installation)
+Install the HHsuite V3 (https://github.com/soedinglab/hh-suite)
+
+Make sure the following parameters are set (which is part of their recommended installation)
     
 1) $HHLIB is set to the folder containing the HHsuite tool
 2) The binary files and the script files are in your path 
 (i.e. if you open a terminal and type "hhblits" or "addss.pl", both should be recognized commands)
 Easiest way to do this is to modify the .bashrc file, and add a few extra lines:
-export HHLIB="/path/to/HHsuite"
-export PATH="$HHLIB/bin:$HHLIB/scripts:$PATH"
+
+        export HHLIB="/path/to/HHsuite"
+        export PATH="$HHLIB/bin:$HHLIB/scripts:$PATH"
+
 Then reboot the terminal or rerun the file (source ~/.bashrc)
 
-- Configure the HHsuite paths:
+Configure the HHsuite paths
 1) Find the file HHPaths.pm in the scripts folder 
 2) You should see a section looking like this:
 
@@ -44,13 +47,14 @@ Then reboot the terminal or rerun the file (source ~/.bashrc)
         #our $ncbidir = ".../blast/bin";           # path to NCBI binaries (for PSIPRED in addss.pl)
 
 3) Complete the paths
- The $execdir and the $ncbidir need to contain the psipred and the blastpgp binaries, respectively.
- The easiest way is to see where your psipred binary is located (which psipred), and point to that folder.
- In the conda package, the ncbidir is usually the same thing, as all the binaries are usually in the same folder.
- e.g. /path/to/conda/envs/RREfinder/bin
 
- For the $datadir, you need to find where the psipred data is stored in the conda package.
- This depends on your conda setup. Example locations include: 
+The $execdir and the $ncbidir need to contain the psipred and the blastpgp binaries, respectively.
+The easiest way is to see where your psipred binary is located (use 'which psipred'), and point to that folder.
+In the conda package, the ncbidir is usually the same thing, as all the binaries are usually in the same folder.
+e.g. /path/to/conda/envs/RREfinder/bin. 
+
+For the $datadir, you need to find where the psipred data is stored in the conda package.
+This depends on your conda setup. Example locations include: 
  
     /path/to/conda/envs/RREfinder/share/psipred_4.01/data
  
@@ -61,12 +65,12 @@ Then reboot the terminal or rerun the file (source ~/.bashrc)
 Alternatively, if you manually install PSIPRED, let the execdir point to the folder containing the psipred binary,
 the datadir to the folder containing the psipred data and the ncbidir to the folder containing the legacy BLAST binary (blastpgp)
          
-RREfinder is now ready for use!
+RREfinder is now ready for use in both modes!
 
 # Usage guide
 
-RREFinder accepts both .fasta files and .genbank files. 
-Alternatively, you can use --antismash RiPP and let the --infile point to a .final.gbk file from antiSMASH analysis. 
+RREFinder accepts both protein .fasta files and .genbank files. 
+Alternatively, you can use '--antismash ripp' and let the --infile point to a .final.gbk file from antiSMASH analysis. 
 This way all the antiSMASH RiPP gene clusters will be analyzed.
 
     python RRE.py -i my_infile.gbk project_name
@@ -84,13 +88,13 @@ Both modes are used by default. To use only precision or exploratory mode, use t
     python RRE.py -i my_infile.gbk -m precision project_name
 or 
 
-    python RRE.py -i my_infile.fasta -t fasta -m exploratory project_name
+    python RRE.py -i my_infile.gbk -m exploratory project_name
 
 You can also specify a range of other options, such as number of cores to use, or the bitscore cutoffs.
-Use 'python RRE.py -h'  to see a list of options.
+Use 'python RRE.py -h'  to see a list of options. If no options are given, they are read from the config.ini file.
 
 # Use RREFinder to detect RREs with the uniclust30 database (Advanced)
-You can also use RREFinder as a way to run the HHPred pipeline in a commandline fashion, just to detect RREs. This provides analogous results as when submitting queries online in the HHPred pipeline. In addition, RRE regions are automatically resubmitted in the same pipeline, to verify them. This requires downloading of the uniclust30 database (https://uniclust.mmseqs.com/).
+You can also use RREFinder as a way to run the HHPred pipeline in a commandline fashion, just to detect RREs. This provides analogous results as when submitting queries online in the HHPred pipeline. In addition, RRE regions are automatically resubmitted in the same pipeline, to verify them. Running the pipeline in this way requires downloading of the uniclust30 database (https://uniclust.mmseqs.com/).
 
 Warning! This process is very time-consuming, and not typically suitable for large-scale analysis.
 
@@ -98,7 +102,7 @@ HHPred is used first to find low-probability hits (<= 40). The region with flank
 
 Setup:
 1) Make sure the pipeline is prepared for exploratory mode as described above.
-2) Download the uniclust30 database from https://uniclust.mmseqs.com/. It is recommended to store the database on an SSD drive.
+2) Download the uniclust30 database from https://uniclust.mmseqs.com/. It is recommended to store the database on an SSD drive. 
 3) Point to the database in the config file, with both the expand_database and the resubmit_database variables
 
         resubmit_database=path/to/uniclust30
