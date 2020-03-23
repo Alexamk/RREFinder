@@ -34,15 +34,12 @@ Then reboot the terminal or rerun the file (source ~/.bashrc)
 - Configure the HHsuite paths:
 1) Find the file HHPaths.pm in the scripts folder 
 2) You should see a section looking like this:
-      
-##############################################################################################
-#PLEASE COMPLETE THE PATHS ... TO PSIPRED AND OLD-STYLE BLAST (NOT BLAST+) (NEEDED FOR PSIPRED)
 
-#our $execdir = ".../psipred/bin";         # path to PSIPRED V2 binaries
-
-#our $datadir = ".../psipred/data";        # path to PSIPRED V2 data files
-
-#our $ncbidir = ".../blast/bin";           # path to NCBI binaries (for PSIPRED in addss.pl)
+        ##############################################################################################
+        #PLEASE COMPLETE THE PATHS ... TO PSIPRED AND OLD-STYLE BLAST (NOT BLAST+) (NEEDED FOR PSIPRED)
+        #our $execdir = ".../psipred/bin";         # path to PSIPRED V2 binaries
+        #our $datadir = ".../psipred/data";        # path to PSIPRED V2 data files
+        #our $ncbidir = ".../blast/bin";           # path to NCBI binaries (for PSIPRED in addss.pl)
 
 3) Complete the paths
  The $execdir and the $ncbidir need to contain the psipred and the blastpgp binaries, respectively.
@@ -67,21 +64,22 @@ RREFinder accepts both .fasta files and .genbank files.
 Alternatively, you can use --antismash RiPP and let the --infile point to a .final.gbk file from antiSMASH analysis. 
 This way all the antiSMASH RiPP gene clusters will be analyzed.
 
-python RRE.py -i my_infile.gbk project_name
+    python RRE.py -i my_infile.gbk project_name
+or
+
+    python RRE.py -i my_infile.fasta -t fasta project_name
 or 
-python RRE.py -i my_infile.fasta -t fasta project_name
-or 
-python RRE.py -i antismash_output.final.gbk --antismash RiPP project_name
+
+    python RRE.py -i antismash_output.final.gbk --antismash RiPP project_name
 
 
 Output can be found under output/project_name
 Both modes are used by default. To use only precision or exploratory mode, use the -m tag. 
 
-python RRE.py -i my_infile.gbk -m precision project_name
+    python RRE.py -i my_infile.gbk -m precision project_name
 or 
-python RRE.py -i my_infile.fasta -t fasta -m exploratory project_name
+
+    python RRE.py -i my_infile.fasta -t fasta -m exploratory project_name
 
 You can also specify a range of other options, such as number of cores to use, or the bitscore cutoffs.
 Use "python RRE.py -h"  to see a list of options.
-
-
