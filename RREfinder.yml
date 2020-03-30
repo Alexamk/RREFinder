@@ -11,6 +11,7 @@ dependencies:
   - blast-legacy=2.2.26=2
   - ca-certificates=2019.11.28=hecc5488_0
   - certifi=2019.11.28=py37hc8dfbb8_1
+  - hmmer=3.3=he1b5a44_0
   - ld_impl_linux-64=2.34=h53a641e_0
   - libblas=3.8.0=14_openblas
   - libcblas=3.8.0=14_openblas
