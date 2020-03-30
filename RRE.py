@@ -125,7 +125,6 @@ def find_genes_in_antismash_clusters(all_seqs,clusters):
         coords_ordered = sorted(coords_scaf.keys())
         # Since the genes are analyzed in order (by coordinates)
         # we can go through the clusters one at a time, sorted by coordinates
-        # This way the features can be sorted in a single interation
         coords_index = 0
         try:
             cluster_coords = coords_ordered[coords_index]
@@ -478,7 +477,7 @@ def resubmit_group(group,RRE_targets,settings,cores):
     # Expand the alignment
     db_path = settings.resubmit_database
     if not os.path.isfile(group.RRE_expalign_file):
-        a3m_hhblits(infile,group.RRE_expalign_file,db_path,settings,cores,n=3)
+        a3m_hhblits(infile,group.RRE_expalign_file,db_path,settings,cores,n=settings.hhblits_iter)
     if settings.addss == 2 or settings.addss == 3:
         add_ss(group,settings,resubmit=True)
     # Run HHsearch
@@ -845,7 +844,7 @@ def pipeline_worker(settings,queue,done_queue):
             if settings_copy.resubmit: 
                 nr_iter = settings_copy.resubmit_initial_hhblits_iter
             else:
-                nr_iter = 3
+                nr_iter = settings.hhblits_iter
             if not os.path.isfile(group.exp_alignment_file) or settings_copy.overwrite_hhblits:
                 a3m_hhblits(infile,group.exp_alignment_file,expand_db_path,settings_copy,1,nr_iter)
             if settings_copy.addss == 1 or settings_copy.addss == 3:
@@ -1036,6 +1035,10 @@ def determine_regulator_overlap(hmm_results,all_groups,settings):
                             # Overlap
                             overlap_data = domain + [round(fraction_overlap,3)]
                             overlaps_to_append.append(overlap_data)
+                    
+                    if overlaps_to_append != []:
+                        group.regulator_overlap = True
+                    
                     # Sort by bitscore
                     overlaps_to_append.sort(key=lambda x: (x[-1],float(x[-2])))
                     
@@ -1047,6 +1050,7 @@ def determine_regulator_overlap(hmm_results,all_groups,settings):
                         
                     elif scantype == 'RREfam':
                         hittype,RRE_data = group.RREfam_data
+                    
                     # Display three regulators max
                     RRE_data[hit].append(overlaps_to_append[0:3])
            
@@ -1208,6 +1212,8 @@ class GeneObject(Container):
         self.antismash = None
         # antiSMASH type
         self.antismash_type = None
+        # regulator overlap
+        self.regulator_overlap = False
         
     def __repr__(self):
         return('GeneObject (name: %s)' %self.name)
@@ -1275,6 +1281,11 @@ def parse_config(configpath):
             setattr(settings,item,value)
     return settings
 
+def filter_regs_results(hits):
+    nr_regs = len([hit for hit in hits if hit.regulator_overlap]) 
+    filtered_hits = [hit for hit in hits if not hit.regulator_overlap] 
+    return filtered_hits, nr_regs
+
 def parse_arguments(configpath):
     
     settings = parse_config(configpath)
@@ -1328,12 +1339,28 @@ if __name__ == '__main__':
     t1 = time.time()
     settings.logger.log('Finished. Total time: %.2f seconds (on %i cores)' %((t1-t0),settings.cores),1)
     if settings.mode == 'rrefinder' or settings.mode == 'both':
-        settings.logger.log('RREfinder hits found: %i out of %i' %(len([i for i in res if i.RRE_hit]),len(res)),1)
+        exploratory_hits = [gene for gene in res if gene.RRE_hit]
         if settings.resubmit:
-            settings.logger.log('RREfinder resubmit hits found: %i out of %i' %(len([i for i in res if i.RRE_hit and i.RRE_resubmit_hit]),len(res)),1)
+            final_hits = [gene for gene in res if gene.RRE_hit and gene.RRE_resubmit_hit]
+        else:
+            final_hits = exploratory_hits
+        if settings.regulator_filter:
+            final_hits, nr_regs_expl = filter_regs_results(final_hits)
+            
+        settings.logger.log('RREfinder exploratory mode preliminary hits found: %i out of %i' %(len(exploratory_hits),len(res)),1)
+        settings.logger.log('RREfinder exploratory mode resubmitted hits found: %i out of %i' %(len(final_hits),len(res)),1)
+        
+        if settings.regulator_filter:
+            settings.logger.log('%i regulators were filtered' %(nr_regs_expl), 1)
+            
     if settings.mode == 'rrefam' or settings.mode == 'both':
-        settings.logger.log('RREFam hits found: %i out of %i' %(len([i for i in res if i.RREfam_hit]),len(res)),1)
-
+        precision_hits = [gene for gene in res if gene.RREfam_hit]
+        if settings.regulator_filter:
+            precision_hits, nr_regs_prec = filter_regs_results(precision_hits)
+        settings.logger.log('RREfinder precision mode hits found: %i out of %i' %(len(precision_hits),len(res)),1)
+        if settings.regulator_filter:
+            settings.logger.log('%i regulators were filtered' %(nr_regs_prec), 1)
+            
 
 
 
