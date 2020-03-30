@@ -13,15 +13,17 @@ Databases need to be downloaded independently. Source will become available soon
 Install the included conda environment with "conda env create -f RREfinder.yml"
 Or make sure the following packages/programs are installed and in your path
 
-- HMMer
-- PSIPRED
-- python package Biopython
+- HMMER version >= 3.3
+- PSIPRED version >= 4.01
+- python package Biopython version >= 1.76
+
+RREFinder has not been tested for previous versions of these packages.
     
 At this point you can already run RREFinder in precision mode. Use python RRE.py with -m precision or --mode precision to do so.
 
 For exploratory mode, please follow the instructions below.
 
-1) Install the HHsuite V3 (https://github.com/soedinglab/hh-suite)
+1) Install the HHsuite version >= 3.0  (https://github.com/soedinglab/hh-suite)
 
 2) Make sure the following parameters are set (which is part of their recommended installation)
     
