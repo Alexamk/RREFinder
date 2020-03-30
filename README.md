@@ -36,7 +36,7 @@ Easiest way to do this is to modify the .bashrc file, and add a few extra lines:
         export HHLIB="/path/to/HHsuite/"
         export PATH="$HHLIB/bin:$HHLIB/scripts:$PATH"
         
-**If you compiled the code from source, make sure your $HHLIB points towards the newly built HHsuite folde in the /build folder.**
+**If you compiled the code from source, make sure your $HHLIB points towards the newly built HHsuite folder, e.g. in the /build folder.**
 If you followed the instructions as on the GitHub of HHsuite, the skeleton used to build it remains, which also contains a script folder. Pointing to this folder will cause errors.
 
 Then reboot the terminal or rerun the file (source ~/.bashrc)
