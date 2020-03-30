@@ -83,16 +83,14 @@ def find_gbk_clusters(all_seqs,req_type=False):
                 product_classes = quals.get('product_class', [])
                 if products:
                     cluster_type = product[0]
-                    cluster_types = cluster_type.split('-')
                 elif product_classes:
                     cluster_type = product_classes[0]
-                    cluster_types = cluster_type.split(',')
                 else:
                     cluster_type = ''
-                    cluster_types = []
                 if req_type:
                     # Only parse clusters of the required types
                     # Only used for now with the RiPP types
+                    cluster_types = cluster_type.split('-')
                     if not any([c in req_type for c in cluster_types]):
                         continue
                 notes = quals.get('note')
