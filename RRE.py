@@ -68,7 +68,10 @@ def gbk_to_dict(all_seqs):
                 data_dict[name] = {'scaffold':contig_id,'feature':feature}
     return seq_dict,data_dict
 
-def find_antismash_clusters(all_seqs,req_type=False):
+
+def find_antismash_clusters(all_seqs, antismash_version, req_type=False):
+    cluster_identifier = get_cluster_identifier(antismash_version)
+    settings.logger.log('Finding antiSMASH BGCs for version %i; cluster identifier: %s' %(antismash_version,cluster_identifier), 2)
     clusters = {}
     for seq in all_seqs:
         contig_id = seq.id
@@ -76,20 +79,31 @@ def find_antismash_clusters(all_seqs,req_type=False):
             contig_id = seq.name
         clusters[contig_id] = {}
         for feature in seq.features:
-            if feature.type == 'cluster':
+            if feature.type == cluster_identifier:
                 coords = int(feature.location.start),int(feature.location.end)
                 quals = feature.qualifiers
                 cluster_type = quals['product'][0]
+                cluster_nr = get_cluster_number(feature,antismash_version)
+                settings.logger.log('antiSMASH BGC found: contig: %s; protocluster_number: %s; product: %s' %(contig_id, cluster_nr, cluster_type), 2)
                 if req_type:
                     # Only parse clusters of the required types
                     # Only used for now with the RiPP types
                     cluster_types = cluster_type.split('-')
                     if not any([c in req_type for c in cluster_types]):
                         continue
-                notes = quals['note']
-                cluster_nr = notes[0]
+                settings.logger.log('Analyzing gene cluster', 2)
                 clusters[contig_id][cluster_nr] = [cluster_type,coords,{}]
     return clusters
+    
+def get_cluster_number(feature, antismash_version):
+    if antismash_version == 4:
+        nr_holder = feature.qualifiers.get('note',[])
+    elif antismash_version == 5:
+        nr_holder = feature.qualifiers.get('protocluster_number',[])
+    if len(nr_holder) == 0:
+        raise ValueError('No cluster number found in feature %s' %feature)
+    cluster_nr = nr_holder[0]
+    return cluster_nr
     
 def find_genes_in_antismash_clusters(all_seqs,clusters):
     # First organize the gene clusters differently - per coordinates rather than per name
@@ -150,18 +164,20 @@ def extract_antismash(infile,settings):
     # Or just parse all genes
     
     # The antiSMASH types (as found in the .gbk files) for antiSMASH parsing
-    antismash_ripps = ['bacteriocin','cyanobactin','lantipeptide',\
+    antismash_ripps = ['bacteriocin','cyanobactin','lantipeptide','lanthipeptide',\
                        'lassopeptide','linaridin','thiopeptide','sactipeptide',\
                        'proteusin','glycocin','bottromycin','microcin']
 
     all_seqs = open_genbank(infile)
     file_dict = {infile:all_seqs}
-
+    
     if settings.antismash == 'ripp':
-        clusters = find_antismash_clusters(all_seqs,req_type=antismash_ripps)
+        clusters = find_antismash_clusters(all_seqs, settings.antismash_version, req_type=antismash_ripps)
     elif settings.antismash == 'clusters' or settings.antismash == 'all':
-        clusters = find_antismash_clusters(all_seqs)
-    seq_dict,data_dict = find_genes_in_antismash_clusters(all_seqs,clusters)
+        clusters = find_antismash_clusters(all_seqs, settings.antismash_version)
+    nr_clusters = sum([len(cluster_nrs) for cluster_nrs in clusters.values()])
+    settings.logger.log('Analyzing %i antiSMASH gene clusters' %(nr_clusters), 1)
+    seq_dict,data_dict = find_genes_in_antismash_clusters(all_seqs, clusters)
     if settings.antismash == 'all':
         seq_dict_all,data_dict_all = gbk_to_dict(all_seqs)
         # Add in the sequence info for genes not in gene clusters
@@ -170,6 +186,12 @@ def extract_antismash(infile,settings):
                 seq_dict[key] = seq_dict_all[key]
                 data_dict[key] = data_dict_all[key]
     return seq_dict,data_dict,clusters,file_dict
+    
+def get_cluster_identifier(antismash_version):
+    if antismash_version == 4:
+        return 'cluster'
+    elif antismash_version == 5:
+        return 'protocluster'
             
 def parse_fasta(path,out=None):
     if out == None:
@@ -260,7 +282,7 @@ def add_ss(group,settings,resubmit=False,remove=False):
             
             if type(stdout) == bytes and not type(stdout) == str:
                 stdout = str(stdout, 'utf-8')
-            if type(stderr) == bytes and not type(stdout) == str:
+            if type(stderr) == bytes and not type(stderr) == str:
                 stderr = str(stderr, 'utf-8')
             settings.logger.log(stdout,2)
             settings.logger.log(stderr,2)
@@ -1060,8 +1082,8 @@ def parse_infiles(settings):
     if os.path.isfile(settings.infile):
         # Singular file
         infile = settings.infile
-        if settings.antismash and not infile.endswith('.final.gbk'):
-            settings.logger.log('Invalid file given with --antismash option. Please point to the *.final.gbk with -i when using --antismash.',0)
+        if settings.antismash and not infile.endswith('.gbk'):
+            settings.logger.log('Invalid file given with --antismash option. Please point to the *.gbk with -i when using --antismash.',0)
             return res
         if not ((settings.intype == 'fasta' and any([infile.endswith(ext) for ext in ['.fas','.fasta','.faa']])) or \
                 (settings.intype == 'genbank' and any([infile.endswith(ext) for ext in ['.gbk','.gbff']]))):
@@ -1070,7 +1092,7 @@ def parse_infiles(settings):
         settings.logger.log('Reading in file %s' %infile,1)
     elif os.path.isdir(settings.infile):
         if settings.antismash:
-            settings.logger.log('Invalid file given with --antismash option. Please point to the *.final.gbk with -i when using --antismash.',0)
+            settings.logger.log('Invalid file given with --antismash option. Please point to the *.gbk with -i when using --antismash.',0)
             return res
         # Get all the relevant files
         files = os.listdir(settings.infile)
