@@ -637,6 +637,9 @@ def write_results_summary(all_groups,outfile,settings,mode,resubmit=False,hmm=Fa
         if hittype == 'hhpred':
             for hit in data:
                 res = data[hit]
+                if regulators and len(res) > 8:
+                    # Regulator overlap found
+                    continue
                 out = [group.org_name]
                 if group.antismash:
                     out.extend([group.antismash,group.antismash_type])
@@ -644,18 +647,21 @@ def write_results_summary(all_groups,outfile,settings,mode,resubmit=False,hmm=Fa
                     out.extend([None,None])
                 out.extend([hit] + [str(i) for i in res[0:6]])
                 out.extend( res[6].split('-') )
-                if regulators and len(res) > 8:
-                    # Regulator overlap found
-                    nr_reg_found = len(res[8])
-                    if nr_reg_found > max_reg_found:
-                        max_reg_found = nr_reg_found
-                    out.append(str(nr_reg_found))
-                    for reg in res[8]:
-                        out.extend([str(i) for i in reg])
+#                if regulators and len(res) > 8:
+#                    # Regulator overlap found
+#                    nr_reg_found = len(res[8])
+#                    if nr_reg_found > max_reg_found:
+#                        max_reg_found = nr_reg_found
+#                    out.append(str(nr_reg_found))
+#                    for reg in res[8]:
+#                        out.extend([str(i) for i in reg])
                 out = [i if i != None else 'N\\A' for i in out]
                 text += '\t'.join(out) + '\n'             
         else:
             for hit,domain_data in data.items():
+                if regulators and len(domain_data) > 4:
+                    # Regulator overlap found
+                    continue
                 out = [group.org_name]
                 if group.antismash:
                     out.extend([group.antismash,group.antismash_type])
@@ -1008,6 +1014,7 @@ def determine_regulator_overlap(hmm_results,all_groups,settings):
                             # Overlap
                             overlap_data = domain + [round(fraction_overlap,3)]
                             overlaps_to_append.append(overlap_data)
+                    # Sort by bitscore
                     overlaps_to_append.sort(key=lambda x: (x[-1],float(x[-2])))
                     
                     if scantype == 'RREfinder':
