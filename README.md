@@ -6,8 +6,7 @@ Bioinformatic application for the detection of RREs in protein sequences of inte
 
 For exploratory mode:
 
-2) Install Git LFS (https://developer.lsst.io/v/DM-7539/tools/git_lfs.html) and setup git LFS (option 1, for read-only, is sufficient)
-3) Pull the databases with git lfs pull
+Databases need to be downloaded independently. Source will become available soon.
 
 # Installation guide:
 
