@@ -23,7 +23,7 @@ At this point you can already run RREFinder in precision mode. Use python RRE.py
 
 For exploratory mode, please follow the instructions below.
 
-1) Install the HHsuite version >= 3.0  (https://github.com/soedinglab/hh-suite)
+1) Install the HHsuite version >= 3.3  (https://github.com/soedinglab/hh-suite)
 
 2) Make sure the following parameters are set (which is part of their recommended installation)
     
@@ -34,6 +34,9 @@ Easiest way to do this is to modify the .bashrc file, and add a few extra lines:
 
         export HHLIB="/path/to/HHsuite"
         export PATH="$HHLIB/bin:$HHLIB/scripts:$PATH"
+        
+**If you compiled the code from source, make sure your $HHLIB points towards the newly built scripts folder.
+If you followed the instructions as on the GitHub of HHsuite, the skeleton used to build it remains, which also contains a script folder. Pointing to this scripts folder will cause errors.**
 
 Then reboot the terminal or rerun the file (source ~/.bashrc)
 
