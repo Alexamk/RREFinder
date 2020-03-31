@@ -178,7 +178,7 @@ def find_genes_in_gbk_clusters(all_seqs,clusters):
     return seq_dict,data_dict
                     
             
-def return_RiPP_subtypes(settings):
+def return_ripp_subtypes(settings):
     if settings.deepbgc:
         return ['RiPP']
     elif settings.antismash:
@@ -203,7 +203,7 @@ def extract_bgcs(infile,settings):
         clusters = find_gbk_clusters(all_seqs, settings)
         
     nr_clusters = sum([len(cluster_nrs) for cluster_nrs in clusters.values()])
-    settings.logger.log('Analyzing %i antiSMASH gene clusters' %(nr_clusters), 1)  
+    settings.logger.log('Analyzing %i %s BGCs' %(nr_clusters, settings.bgc_parser), 1)  
     seq_dict,data_dict = find_genes_in_gbk_clusters(all_seqs,clusters)
 
     if clusters_to_extract == 'all':
@@ -216,50 +216,6 @@ def extract_bgcs(infile,settings):
                 
     return seq_dict,data_dict,clusters,file_dict
 
-#def extract_antismash(infile,settings):
-
-#    if settings.antismash == 'ripp':
-#        clusters = find_gbk_clusters(all_seqs, find_gbk_clusters, req_type=antismash_ripps)
-#    elif settings.antismash == 'clusters' or settings.antismash == 'all':
-#        clusters = find_gbk_clusters(all_seqs, settings.antismash_version)
-#    nr_clusters = sum([len(cluster_nrs) for cluster_nrs in clusters.values()])
-#    settings.logger.log('Analyzing %i antiSMASH gene clusters' %(nr_clusters), 1)
-#    seq_dict,data_dict = find_genes_in_antismash_clusters(all_seqs, clusters)
-
-#    if settings.antismash == 'all':
-#        seq_dict_all,data_dict_all = gbk_to_dict(all_seqs)
-#        # Add in the sequence info for genes not in gene clusters
-#        for key in seq_dict_all:
-#            if key not in seq_dict:
-#                seq_dict[key] = seq_dict_all[key]
-#                data_dict[key] = data_dict_all[key]
-#    return seq_dict,data_dict,clusters,file_dict
-#    
-#def extract_deepbgc(infile,settings):
-#    # For DeepBGC:
-#    # Given the type of clusters to be analyzed (RiPP or all)
-#    # return the relevant genes
-#    # Or just parse all genes
-#    
-#    all_seqs = open_genbank(infile)
-#    file_dict = {infile:all_seqs}
-
-#    if settings.deepbgc == 'ripp':
-#        clusters = find_gbk_clusters(all_seqs, req_type=['RiPP'])
-#    elif settings.deepbgc == 'clusters' or settings.deepbgc == 'all':
-#        clusters = find_gbk_clusters(all_seqs)
-#    seq_dict,data_dict = find_genes_in_gbk_clusters(all_seqs,clusters)
-#    if settings.deepbgc == 'all':
-#        seq_dict_all,data_dict_all = gbk_to_dict(all_seqs)
-#        # Add in the sequence info for genes not in gene clusters
-#        for key in seq_dict_all:
-#            if key not in seq_dict:
-#                seq_dict[key] = seq_dict_all[key]
-#                data_dict[key] = data_dict_all[key]
-#    return seq_dict,data_dict,clusters,file_dict
-
-
-            
 def parse_fasta(path,out=None):
     if out == None:
         out = {}
@@ -977,16 +933,12 @@ def rrefinder_main(settings,RRE_targets,all_groups):
     # at a time and finishes it completely
     # For hmm, it is less efficient to split up all the jobs individually, since hmmsearch simply takes a fasta file containing all sequences
     if settings.rrefinder_primary_mode == 'hmm':
-#        compare_feature(parsed_data_dict,all_groups[7])
         run_hmm(all_groups,settings)
-#        compare_feature(parsed_data_dict,all_groups[7])
         if settings.resubmit:
             if int(settings.cores) < len([i for i in all_groups if i.RRE_hit]) and int(settings.cores) > 1:
                 # Resubmit with pipeline operator if multiple cores are used and the amount of cores is smaller than the amount of jobs
-#                compare_feature(parsed_data_dict,all_groups[7])
                 pos_groups,_ = pipeline_operator([i for i in all_groups if i.RRE_hit],settings,pipeline_resubmit_worker)
                 all_groups = [i for i in all_groups if not i.RRE_hit] + pos_groups
-#                compare_feature(parsed_data_dict,all_groups_org[7])
             else:
                 resubmit_all(all_groups,RRE_targets,settings)
             
@@ -1195,23 +1147,6 @@ def parse_infiles(settings):
         res['cluster_dict'] = cluster_dict
         res['file_dict'] = file_dict
 
-
-#    if settings.antismash:
-#        seq_dict,data_dict,cluster_dict,file_dict = extract_antismash(infile,settings)
-#        if seq_dict == {}:
-#            settings.logger.log('No antismash gene clusters found of the given type',0)
-#            return res
-#        res['data_dict'] = data_dict
-#        res['cluster_dict'] = cluster_dict
-#        res['file_dict'] = file_dict
-#    elif settings.deepbgc:
-#        seq_dict,data_dict,cluster_dict,file_dict = extract_deepbgc(infile,settings)
-#        if seq_dict == {}:
-#            settings.logger.log('No deepbgc gene clusters found of the given type',0)
-#            return res
-#        res['data_dict'] = data_dict
-#        res['cluster_dict'] = cluster_dict
-#        res['file_dict'] = file_dict
     elif settings.intype == 'fasta':
         seq_dict = parse_fasta(infile)
     elif settings.intype == 'genbank':
@@ -1247,19 +1182,14 @@ def main(settings):
         exit()
     
     all_groups,skipped_genes = make_gene_objects(parsed_data_dict,settings)
-#    compare_feature(parsed_data_dict,all_groups[7])
-#    return(all_groups,parsed_data_dict)
     settings.logger.log('Continuing with %i queries' %(len(all_groups)),1)
     settings.logger.log('Skipped %i genes' %(len(skipped_genes)),2)
     if settings.mode == 'rrefinder' or settings.mode == 'both':
         all_groups = rrefinder_main(settings,RRE_targets,all_groups)
-#    compare_feature(parsed_data_dict,all_groups[7])
     if settings.mode == 'rrefam' or settings.mode == 'both':
         rrefam_main(settings,all_groups)
-#    compare_feature(parsed_data_dict,all_groups[7])
     if settings.regulator_filter:
         scan_regulators(settings,all_groups)
-#    compare_feature(parsed_data_dict,all_groups[7])
     # Summary files
     if settings.mode == 'rrefinder' or settings.mode == 'both':
         outfile = os.path.join(settings.data_folder,'%s_rrefinder_results.txt' %settings.project_name)
@@ -1270,7 +1200,6 @@ def main(settings):
     if settings.mode == 'rrefam' or settings.mode == 'both':
         outfile_rrefam = os.path.join(settings.data_folder,'%s_rrefam_results.txt' %settings.project_name)
         write_results_summary(all_groups,outfile_rrefam,settings,'rrefam',resubmit=False,hmm=True)
-#    compare_feature(parsed_data_dict,all_groups[7])   
     # Write a new genbank file if necessary
     if settings.update_genbank:
         if settings.intype == 'fasta' and not settings.antismash and not settings.deepbgc:
@@ -1278,7 +1207,6 @@ def main(settings):
         else:
             update_features(all_groups,parsed_data_dict,settings)
             write_genbank(parsed_data_dict['file_dict'],settings)
-#    compare_feature(parsed_data_dict,all_groups[7])
     return all_groups,parsed_data_dict
 
 class Container():
