@@ -68,10 +68,10 @@ def gbk_to_dict(all_seqs):
                 data_dict[name] = {'scaffold':contig_id,'feature':feature}
     return seq_dict,data_dict
 
+def find_gbk_clusters(all_seqs,settings,req_type=False):
+    cluster_identifier = get_cluster_identifier(settings)
+    settings.logger.log('Finding %s BGCs with cluster identifier: %s' %(settings.bgc_parser, cluster_identifier), 2)
 
-def find_antismash_clusters(all_seqs, antismash_version, req_type=False):
-    cluster_identifier = get_cluster_identifier(antismash_version)
-    settings.logger.log('Finding antiSMASH BGCs for version %i; cluster identifier: %s' %(antismash_version,cluster_identifier), 2)
     clusters = {}
     for seq in all_seqs:
         contig_id = seq.id
@@ -81,31 +81,53 @@ def find_antismash_clusters(all_seqs, antismash_version, req_type=False):
         for feature in seq.features:
             if feature.type == cluster_identifier:
                 coords = int(feature.location.start),int(feature.location.end)
-                quals = feature.qualifiers
-                cluster_type = quals['product'][0]
-                cluster_nr = get_cluster_number(feature,antismash_version)
-                settings.logger.log('antiSMASH BGC found: contig: %s; protocluster_number: %s; product: %s' %(contig_id, cluster_nr, cluster_type), 2)
+
+                cluster_nr = get_cluster_number(feature,settings)
+                cluster_product = get_cluster_product(feature,settings)
+                
+                settings.logger.log('BGC found: contig: %s; protocluster_number: %s; product: %s' %(contig_id, cluster_nr, cluster_product), 2)
+                
                 if req_type:
                     # Only parse clusters of the required types
                     # Only used for now with the RiPP types
-                    cluster_types = cluster_type.split('-')
-                    if not any([c in req_type for c in cluster_types]):
-                        continue
-                settings.logger.log('Analyzing gene cluster', 2)
-                clusters[contig_id][cluster_nr] = [cluster_type,coords,{}]
+                    cluster_products = cluster_product.split('-')
+                    # Splitting is required for antiSMASH V4
+                    if not any([c in req_type for c in cluster_products]):
+                        continue 
+                
+                settings.logger.log('Analyzing BGC', 2)
+                clusters[contig_id][cluster_nr] = [cluster_product,coords,{}]
     return clusters
-    
-def get_cluster_number(feature, antismash_version):
-    if antismash_version == 4:
-        nr_holder = feature.qualifiers.get('note',[])
-    elif antismash_version == 5:
-        nr_holder = feature.qualifiers.get('protocluster_number',[])
-    if len(nr_holder) == 0:
-        raise ValueError('No cluster number found in feature %s' %feature)
-    cluster_nr = nr_holder[0]
+       
+def get_cluster_identifier(settings):
+    if settings.antismash_version == 4 or settings.deepbgc:
+        return 'cluster'
+    elif settings.antismash_version == 5:
+        return 'protocluster'
+       
+def get_cluster_number(feature, settings):
+    if settings.deepbgc:
+        ID_holder = feature.qualifiers.get('bgc_candidate_id')
+    elif settings.antismash:
+        if settings.antismash_version == 4:
+            ID_holder = feature.qualifiers.get('note')
+        elif settings.antismash_version == 5:
+            ID_holder = feature.qualifiers.get('protocluster_number')
+    if not ID_holder:
+        raise ValueError('No cluster ID found in feature {}'.format(feature))
+    cluster_nr = ID_holder[0]
     return cluster_nr
     
-def find_genes_in_antismash_clusters(all_seqs,clusters):
+def get_cluster_product(feature,settings):
+    if settings.deepbgc:
+        product_holder = feature.qualifiers.get('product_class')
+    if settings.antismash or not product_holder:
+        product_holder = feature.qualifiers.get('product')
+    if not product_holder:
+        raise ValueError('No product found in feature {}'.format(feature))
+    return product_holder[0]
+    
+def find_genes_in_gbk_clusters(all_seqs,clusters):
     # First organize the gene clusters differently - per coordinates rather than per name
     clusters_per_coords = {}
     for scaffold in clusters:
@@ -152,45 +174,91 @@ def find_genes_in_antismash_clusters(all_seqs,clusters):
                 if (end > cluster_coords[0] and start < cluster_coords[1]):
                     name,prot_sequence = assign_feature_name_sequence(feature,scaffold,seq)
                     seq_dict[name] = prot_sequence
-                    data_dict[name] = {'scaffold':scaffold,'feature':feature,'antismash':cluster_nr}
+                    data_dict[name] = {'scaffold':scaffold,'feature':feature,'cluster_nr':cluster_nr}
     return seq_dict,data_dict
                     
             
-def extract_antismash(infile,settings):
-    # For antiSMASH:
+def return_RiPP_subtypes(settings):
+    if settings.deepbgc:
+        return ['RiPP']
+    elif settings.antismash:
+        return ['bacteriocin','cyanobactin','lantipeptide','lanthipeptide',
+                       'lassopeptide','linaridin','thiopeptide','sactipeptide',
+                       'proteusin','glycocin','bottromycin','microcin']
+          
+def extract_bgcs(infile,settings):
+    # For BGC parsing (antiSMASH or DeppBGC):
     # Given the type of clusters to be analyzed (RiPP or all)
     # return the relevant genes
     # Or just parse all genes
-    
-    # The antiSMASH types (as found in the .gbk files) for antiSMASH parsing
-    antismash_ripps = ['bacteriocin','cyanobactin','lantipeptide','lanthipeptide',\
-                       'lassopeptide','linaridin','thiopeptide','sactipeptide',\
-                       'proteusin','glycocin','bottromycin','microcin']
-
+            
     all_seqs = open_genbank(infile)
     file_dict = {infile:all_seqs}
     
-    if settings.antismash == 'ripp':
-        clusters = find_antismash_clusters(all_seqs, settings.antismash_version, req_type=antismash_ripps)
-    elif settings.antismash == 'clusters' or settings.antismash == 'all':
-        clusters = find_antismash_clusters(all_seqs, settings.antismash_version)
+    clusters_to_extract = getattr(settings,settings.bgc_parser)
+    if clusters_to_extract == 'ripp':
+        ripps = return_ripp_subtypes(settings)
+        clusters = find_gbk_clusters(all_seqs, settings, req_type=ripps)
+    elif clusters_to_extract == 'clusters' or clusters_to_extract == 'all':
+        clusters = find_gbk_clusters(all_seqs, settings)
+        
     nr_clusters = sum([len(cluster_nrs) for cluster_nrs in clusters.values()])
-    settings.logger.log('Analyzing %i antiSMASH gene clusters' %(nr_clusters), 1)
-    seq_dict,data_dict = find_genes_in_antismash_clusters(all_seqs, clusters)
-    if settings.antismash == 'all':
+    settings.logger.log('Analyzing %i antiSMASH gene clusters' %(nr_clusters), 1)  
+    seq_dict,data_dict = find_genes_in_gbk_clusters(all_seqs,clusters)
+
+    if clusters_to_extract == 'all':
         seq_dict_all,data_dict_all = gbk_to_dict(all_seqs)
         # Add in the sequence info for genes not in gene clusters
         for key in seq_dict_all:
             if key not in seq_dict:
                 seq_dict[key] = seq_dict_all[key]
                 data_dict[key] = data_dict_all[key]
+                
     return seq_dict,data_dict,clusters,file_dict
-    
-def get_cluster_identifier(antismash_version):
-    if antismash_version == 4:
-        return 'cluster'
-    elif antismash_version == 5:
-        return 'protocluster'
+
+#def extract_antismash(infile,settings):
+
+#    if settings.antismash == 'ripp':
+#        clusters = find_gbk_clusters(all_seqs, find_gbk_clusters, req_type=antismash_ripps)
+#    elif settings.antismash == 'clusters' or settings.antismash == 'all':
+#        clusters = find_gbk_clusters(all_seqs, settings.antismash_version)
+#    nr_clusters = sum([len(cluster_nrs) for cluster_nrs in clusters.values()])
+#    settings.logger.log('Analyzing %i antiSMASH gene clusters' %(nr_clusters), 1)
+#    seq_dict,data_dict = find_genes_in_antismash_clusters(all_seqs, clusters)
+
+#    if settings.antismash == 'all':
+#        seq_dict_all,data_dict_all = gbk_to_dict(all_seqs)
+#        # Add in the sequence info for genes not in gene clusters
+#        for key in seq_dict_all:
+#            if key not in seq_dict:
+#                seq_dict[key] = seq_dict_all[key]
+#                data_dict[key] = data_dict_all[key]
+#    return seq_dict,data_dict,clusters,file_dict
+#    
+#def extract_deepbgc(infile,settings):
+#    # For DeepBGC:
+#    # Given the type of clusters to be analyzed (RiPP or all)
+#    # return the relevant genes
+#    # Or just parse all genes
+#    
+#    all_seqs = open_genbank(infile)
+#    file_dict = {infile:all_seqs}
+
+#    if settings.deepbgc == 'ripp':
+#        clusters = find_gbk_clusters(all_seqs, req_type=['RiPP'])
+#    elif settings.deepbgc == 'clusters' or settings.deepbgc == 'all':
+#        clusters = find_gbk_clusters(all_seqs)
+#    seq_dict,data_dict = find_genes_in_gbk_clusters(all_seqs,clusters)
+#    if settings.deepbgc == 'all':
+#        seq_dict_all,data_dict_all = gbk_to_dict(all_seqs)
+#        # Add in the sequence info for genes not in gene clusters
+#        for key in seq_dict_all:
+#            if key not in seq_dict:
+#                seq_dict[key] = seq_dict_all[key]
+#                data_dict[key] = data_dict_all[key]
+#    return seq_dict,data_dict,clusters,file_dict
+
+
             
 def parse_fasta(path,out=None):
     if out == None:
@@ -385,10 +453,10 @@ def make_gene_objects(parsed_data_dict,settings):
             scaffold = data['scaffold']
             gene_obj.setattrs(scaffold=scaffold)
             
-            if settings.antismash and 'antismash' in data:
-                cluster_nr = data['antismash']
+            if (settings.antismash or settings.deepbgc) and 'cluster_nr' in data:
+                cluster_nr = data['cluster_nr']
                 cluster_dict = parsed_data_dict['cluster_dict']
-                gene_obj.setattrs(antismash=cluster_nr,antismash_type=cluster_dict[scaffold][cluster_nr][0])
+                gene_obj.setattrs(cluster_nr=cluster_nr,cluster_type=cluster_dict[scaffold][cluster_nr][0])
             
         if settings.mode != 'rrefam' and settings.rrefinder_primary_mode == 'hhpred':
             exp_alignment_file = os.path.join(settings.fasta_folder,'%s_expalign.a3m' %gene)
@@ -662,8 +730,8 @@ def write_results_summary(all_groups,outfile,settings,mode,resubmit=False,hmm=Fa
                     # Regulator overlap found
                     continue
                 out = [group.org_name]
-                if group.antismash:
-                    out.extend([group.antismash,group.antismash_type])
+                if group.cluster_nr:
+                    out.extend([group.cluster_nr,group.cluster_type])
                 else:
                     out.extend([None,None])
                 out.extend([hit] + [str(i) for i in res[0:6]])
@@ -684,8 +752,8 @@ def write_results_summary(all_groups,outfile,settings,mode,resubmit=False,hmm=Fa
                     # Regulator overlap found
                     continue
                 out = [group.org_name]
-                if group.antismash:
-                    out.extend([group.antismash,group.antismash_type])
+                if group.cluster_nr:
+                    out.extend([group.cluster_nr,group.cluster_type])
                 else:
                     out.extend([None,None])
                 out.extend([hit,str(domain_data[2]),str(domain_data[3]),str(domain_data[0]),str(domain_data[1])])
@@ -704,7 +772,7 @@ def write_results_summary(all_groups,outfile,settings,mode,resubmit=False,hmm=Fa
 
     with open(outfile,'w') as handle:
         header = ['Gene name']
-        header.extend(['antiSMASH BGC','antiSMASH BGC product'])
+        header.extend(['BGC ID','BGC product'])
         if not hmm:
             header.extend(['Model name','Probability','E-value','P-value','Score','SS','Columns','RRE start', 'RRE end'])
         else:
@@ -1117,14 +1185,33 @@ def parse_infiles(settings):
         settings.logger.log('No valid file or directory given',0)
         return res
     
-    if settings.antismash:
-        seq_dict,data_dict,cluster_dict,file_dict = extract_antismash(infile,settings)
+    if settings.antismash or settings.deepbgc:
+        set_bgc_parser(settings)
+        seq_dict,data_dict,cluster_dict,file_dict = extract_bgcs(infile,settings)
         if seq_dict == {}:
-            settings.logger.log('No antismash gene clusters found of the given type',0)
+            settings.logger.log('No {} BGCs found of the given type'.format(settings.bgc_parser),0)
             return res
         res['data_dict'] = data_dict
         res['cluster_dict'] = cluster_dict
         res['file_dict'] = file_dict
+
+
+#    if settings.antismash:
+#        seq_dict,data_dict,cluster_dict,file_dict = extract_antismash(infile,settings)
+#        if seq_dict == {}:
+#            settings.logger.log('No antismash gene clusters found of the given type',0)
+#            return res
+#        res['data_dict'] = data_dict
+#        res['cluster_dict'] = cluster_dict
+#        res['file_dict'] = file_dict
+#    elif settings.deepbgc:
+#        seq_dict,data_dict,cluster_dict,file_dict = extract_deepbgc(infile,settings)
+#        if seq_dict == {}:
+#            settings.logger.log('No deepbgc gene clusters found of the given type',0)
+#            return res
+#        res['data_dict'] = data_dict
+#        res['cluster_dict'] = cluster_dict
+#        res['file_dict'] = file_dict
     elif settings.intype == 'fasta':
         seq_dict = parse_fasta(infile)
     elif settings.intype == 'genbank':
@@ -1137,6 +1224,12 @@ def parse_infiles(settings):
     res['seq_dict'] = seq_dict
     
     return res
+    
+def set_bgc_parser(settings):
+    if settings.deepbgc:
+        settings.bgc_parser = 'deepbgc'
+    elif settings.antismash:
+        settings.bgc_parser = 'antismash'
       
 def main(settings):
     # Prepwork
@@ -1180,7 +1273,7 @@ def main(settings):
 #    compare_feature(parsed_data_dict,all_groups[7])   
     # Write a new genbank file if necessary
     if settings.update_genbank:
-        if settings.intype == 'fasta' and not settings.antismash:
+        if settings.intype == 'fasta' and not settings.antismash and not settings.deepbgc:
             settings.logger.log('Skipping genbank output as input file was in fasta format',1)
         else:
             update_features(all_groups,parsed_data_dict,settings)
@@ -1208,10 +1301,12 @@ class GeneObject(Container):
     def __init__(self):
         # Name
         self.name = 'No_name_given'
-        # antiSMASH cluster the gene is part of
-        self.antismash = None
-        # antiSMASH type
-        self.antismash_type = None
+        
+        # antiSMASH or DeepBGC cluster the gene is part of
+        self.cluster_nr = None
+        # antiSMASH or DeepBGC type
+        self.cluster_type = None
+        
         # regulator overlap
         self.regulator_overlap = False
         
@@ -1225,6 +1320,8 @@ class Settings(Container):
         self.project_name = 'No name given'
         # Run antismash?
         self.antismash = None
+        # Run deepbgc?
+        self.deepbgc = None
     
     def __repr__(self):
         return('Settings object (project name: %s)' %project_name)
@@ -1249,8 +1346,6 @@ class Log():
                 with open(self.logfile,'a') as handle:
                     handle.write(text + '\n')
 
-            
-    
 def parse_config(configpath):
     config = configparser.ConfigParser()
     config.read(configpath)
@@ -1295,7 +1390,9 @@ def parse_arguments(configpath):
     parser.add_argument('project_name',metavar='PROJECT NAME',help='A name for your project')
     parser.add_argument('-i','--infile',help='File or folder to be analyzed')
     parser.add_argument('-t','--intype',help='Type of input file to be analyzed (fasta or genbank; default genbank)',default='genbank')
-    parser.add_argument('--antismash',help='Infile is a .final.gbk from antiSMASH. Choose between ripp (analyze RiPP BGCs), clusters (analyze all gene clusters)' +\
+    parser.add_argument('--antismash',help='Infile is a .gbk from antiSMASH. Choose between ripp (analyze RiPP BGCs), clusters (analyze all gene clusters)' +\
+                                            ' and all (analyze all genes). Overrides --intype argument', choices=['ripp','clusters','all'])
+    parser.add_argument('--deepbgc',help='Infile is a .full.gbk or .bgc.gbk from DeepBGC. Choose between ripp (analyze RiPP BGCs), clusters (analyze all gene clusters)' +\
                                             ' and all (analyze all genes). Overrides --intype argument', choices=['ripp','clusters','all'])
     parser.add_argument('-o','--outputfolder',help='Folder where the output will be generated (default: output)',default='output')
     parser.add_argument('-c','--cores',help='Number of cores to use',type=int)
@@ -1326,14 +1423,20 @@ def parse_arguments(configpath):
     elif settings.mode == 'exploratory':
         settings.mode = 'rrefinder'
         
-    return settings
 
+    return settings
+    
+def check_incompatible_settings(settings):
+    if settings.rrefinder_primary_mode == 'hhpred' and not settings.expand_database_path:
+        raise ValueError('Using HHpred as initial mode for RREfinder requires an HHblits database. Please set the path in the config file')
+    if settings.deepbgc and settings.antismash:
+        raise ValueError('Incompatible settings: --deepbgc and --antismash')
+       
+        
 if __name__ == '__main__':
     configpath = os.path.join(os.path.join(os.path.dirname(__file__),'config.ini'))
     settings = parse_arguments(configpath)
-    if settings.rrefinder_primary_mode == 'hhpred' and not settings.expand_database_path:
-        print('Using HHpred as initial mode for RREfinder requires an HHblits database. Please set the path in the config file')
-        exit()
+    check_incompatible_settings(settings)
     t0 = time.time()
     res,parsed_data_dict = main(settings)
     t1 = time.time()
