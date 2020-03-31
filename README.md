@@ -1,14 +1,14 @@
 # RREFinder
 Bioinformatic application for the detection of RREs in protein sequences of interest
 
-# Download guide:
+## Download guide:
 1) Clone the repository
 
 For exploratory mode:
 
 Databases need to be downloaded independently. Source will become available soon.
 
-# Installation guide:
+## Installation guide:
 
 Install the included conda environment with "conda env create -f RREfinder.yml"
 Or make sure the following packages/programs are installed and in your path
@@ -23,7 +23,7 @@ At this point you can already run RREFinder in precision mode. Use python RRE.py
 
 For exploratory mode, please follow the instructions below.
 
-1) Install the HHsuite version >= 3.0  (https://github.com/soedinglab/hh-suite)
+1) Install the HHsuite version >= 3.3  (https://github.com/soedinglab/hh-suite)
 
 2) Make sure the following parameters are set (which is part of their recommended installation)
     
@@ -32,8 +32,12 @@ For exploratory mode, please follow the instructions below.
 (i.e. if you open a terminal and type "hhblits" or "addss.pl", both should be recognized commands)
 Easiest way to do this is to modify the .bashrc file, and add a few extra lines:
 
-        export HHLIB="/path/to/HHsuite"
+
+        export HHLIB="/path/to/HHsuite/"
         export PATH="$HHLIB/bin:$HHLIB/scripts:$PATH"
+        
+**If you compiled the code from source, make sure your $HHLIB points towards the newly built HHsuite folder, e.g. in the /build folder.**
+If you followed the instructions as on the GitHub of HHsuite, the skeleton used to build it remains, which also contains a script folder. Pointing to this folder will cause errors.
 
 Then reboot the terminal or rerun the file (source ~/.bashrc)
 
@@ -69,7 +73,7 @@ the datadir to the folder containing the psipred data and the ncbidir to the fol
          
 RREfinder is now ready for use in both modes!
 
-# Usage guide
+## Usage guide
 
 RREFinder accepts both protein .fasta files and .genbank files. 
 Alternatively, you can use '--antismash ripp' and let the --infile point to a .final.gbk file from antiSMASH analysis. 
@@ -95,7 +99,7 @@ or
 You can also specify a range of other options, such as number of cores to use, or the bitscore cutoffs.
 Use 'python RRE.py -h'  to see a list of options. If no options are given, they are read from the config.ini file.
 
-# Use RREFinder to detect RREs with the uniclust30 database (Advanced)
+## Use RREFinder to detect RREs with the uniclust30 database (Advanced)
 You can also use RREFinder as a way to run the HHPred pipeline in a commandline fashion, just to detect RREs. This provides analogous results as when submitting queries online in the HHPred pipeline. In addition, RRE regions are automatically resubmitted in the same pipeline, to verify them. Running the pipeline in this way requires downloading of the uniclust30 database (https://uniclust.mmseqs.com/).
 
 Warning! This process is very time-consuming, and not typically suitable for large-scale analysis.
