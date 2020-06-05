@@ -6,7 +6,8 @@ Bioinformatic application for the detection of RREs in protein sequences of inte
 
 For exploratory mode:
 
-Databases need to be downloaded independently. Source will become available soon.
+Databases need to be downloaded independently from https://zenodo.org/record/3733240#.XoRkIUEzbCI. 
+Please download all the files, except the folder with the seed sequences, and place them into the data/database folder within the downloaded repository.
 
 ## Installation guide:
 
