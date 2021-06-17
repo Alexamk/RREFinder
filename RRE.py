@@ -41,7 +41,7 @@ def open_genbank(in_path):
         all_seqs.append(seq_record)
     return(all_seqs)
 
-def assign_feature_name_sequence(feature,contig_id,seq):
+def assign_feature_name_sequence(feature,contig_id,scaffold):
     name = contig_id
     name += '_%s-%s' %(feature.location.start,feature.location.end)
     for item in ['gene','locus_tag','protein_id']:
@@ -50,20 +50,20 @@ def assign_feature_name_sequence(feature,contig_id,seq):
     if 'translation' in feature.qualifiers:
         sequence = feature.qualifiers['translation'][0]
     else:
-        sequence = feature.extract(seq).translate()
+        sequence = str(feature.extract(scaffold).seq.translate())
     return name,sequence   
 
 def gbk_to_dict(all_seqs):
     # Get all gene sequences, assign a name, and return for further processing
     seq_dict = {}
     data_dict = {}
-    for seq in all_seqs:
-        contig_id = seq.id
-        if seq.id == 'unknown':
-            contig_id = seq.name
-        for feature in seq.features:
+    for scaffold in all_seqs:
+        contig_id = scaffold.id
+        if scaffold.id == 'unknown':
+            contig_id = scaffold.name
+        for feature in scaffold.features:
             if feature.type == 'CDS':
-                name,prot_sequence = assign_feature_name_sequence(feature,contig_id,seq)
+                name,prot_sequence = assign_feature_name_sequence(feature,contig_id,scaffold)
                 seq_dict[name] = prot_sequence
                 data_dict[name] = {'scaffold':contig_id,'feature':feature}
     return seq_dict,data_dict
@@ -1180,7 +1180,7 @@ def main(settings):
     parsed_data_dict = parse_infiles(settings)
     if parsed_data_dict['seq_dict'] == {}:
         exit()
-    
+
     all_groups,skipped_genes = make_gene_objects(parsed_data_dict,settings)
     settings.logger.log('Continuing with %i queries' %(len(all_groups)),1)
     settings.logger.log('Skipped %i genes' %(len(skipped_genes)),2)
