@@ -26,7 +26,7 @@ Running the script `setup_RRE_exploratory.py` will create shell files in the `/e
 
 Note that the script is sort of trying to overcome the fact that the HHsuite scripts are not officially supported. It has not been tested in a wide variety of conda environments. Use at your own risk, and let me know if it can be improved.
 
-Databases are downloaded using the `download_RRE_databases.py`` script. The `setup_RRE_exploratory.py` script takes care of this. You can also download them manually from https://zenodo.org/record/3733240#.XoRkIUEzbCI. If doing manually, download all the files, except the folder with the seed sequences, and place them into the data/database folder within the downloaded repository.
+Databases are downloaded using the `download_RRE_databases.py` script. The `setup_RRE_exploratory.py` script takes care of this. You can also download them manually from https://zenodo.org/record/3733240#.XoRkIUEzbCI. If doing manually, download all the files, except the folder with the seed sequences, and place them into the data/database folder within the downloaded repository.
 
 If you prefer to perform steps 1-4 yourself (or if you prefer a manual installation), you can follow the steps below.
 
