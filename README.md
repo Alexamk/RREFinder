@@ -12,11 +12,11 @@ This can also be done by running ''download_RRE_databases.py''
 
 ## Installation guide:
 
-Install the included conda environment with "conda env create -f RREfinder.yml"
+Install the included conda environment with `conda env create -f RREfinder.yml`.
     
 At this point you can already run RREFinder in precision mode. Use python RRE.py with -m precision or --mode precision to do so.
 
-For exploratory mode, four more steps are necessary to use all functionalities of the HHSuite. These are accomplished by running the ''setup_RRE_exploratory.py'' script in the activated environment for conda-style installations. 
+For exploratory mode, four more steps are necessary to use all functionalities of the HHSuite. These are accomplished by running the `setup_RRE_exploratory.py` script in the activated environment for conda-style installations. 
 
 In detail:
 
@@ -28,14 +28,13 @@ In detail:
 
 4) The databases need to be downloaded
 
-Exploratory mode relies on the secondary structure predictions of HHSuite. Although the HHSuite is installed with Conda, the secondary structure prediction script is not. Nevertheless, it is downloaded along with the rest of the package, and can be found in the environment scripts folder (Typically found under ''$CONDA_PREFIX/scripts''
+Exploratory mode relies on the secondary structure predictions of HHSuite. Although the HHSuite is installed with Conda, the secondary structure prediction script is not, and not officially supported. It is required for exploratory mode however. It is downloaded along with the rest of the HHSuite package, and can be found in the environment scripts folder (Typically found under `$CONDA_PREFIX/scripts`).
 
-Running the script "setup_RRE_exploratory.py" will create shell files in the /etc/conda/activate.d and /etc/conda/deactivate.d folders that set and unset/reset the HHLIB and PATH variables. It will find the HHPaths.pm file and update it. And it will download the databases from the zenodo repository.
-Note that the script has not been tested in a wide variety of conda environments. Use at your own risk, and let me know if it can be improved.
+Running the script `setup_RRE_exploratory.py` will create shell files in the `/etc/conda/activate.d` and `/etc/conda/deactivate.d` folders that set and unset/reset the HHLIB and PATH variables. It will find the `HHPaths.pm` file and update it. And it will download the databases from the zenodo repository.
 
+Note that the script is sort of trying to overcome the fact that the HHsuite scripts are not officially supported. It has not been tested in a wide variety of conda environments. Use at your own risk, and let me know if it can be improved.
 
-If you prefer to set these yourself (or if you have done a manual installation), you can follow the steps below.
-
+If you prefer to perform steps 1-4 yourself (or if you prefer a manual installation), you can follow the steps below.
 
 ## Manual install
 
