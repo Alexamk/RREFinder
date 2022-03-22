@@ -1175,8 +1175,6 @@ def main(settings):
     # Set the logfile
     logger = Log(settings.logfile,settings.verbosity)
     settings.logger = logger
-    # Get the names of the targets that are considered RRE hits
-    RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
 
     # Now parse the files
     parsed_data_dict = parse_infiles(settings)
@@ -1187,6 +1185,8 @@ def main(settings):
     settings.logger.log('Continuing with %i queries' %(len(all_groups)),1)
     settings.logger.log('Skipped %i genes' %(len(skipped_genes)),2)
     if settings.mode == 'rrefinder' or settings.mode == 'both':
+        # Get the names of the targets that are considered RRE hits
+        RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
         all_groups = rrefinder_main(settings,RRE_targets,all_groups)
     if settings.mode == 'rrefam' or settings.mode == 'both':
         rrefam_main(settings,all_groups)
@@ -1369,6 +1369,8 @@ def check_settings(settings):
         elif settings.rrefinder_primary_mode == 'hmm':
             required_files['exploratory_hmm'] = [settings.hmm_db]
         required_files['exploratory_hhpred_resubmit_database'] = [f'{settings.resubmit_database}_{ext}' for ext in required_database_files]
+        required_files['HHsearch_fasta'] = [settings.rre_fasta_path]
+        required_files['HHsearch_database'] = [f'{settings.rre_database_path}_{ext}' for ext in required_database_files]
     for category, files in required_files.items():
         for file in files:
             if not os.path.isfile(file):
