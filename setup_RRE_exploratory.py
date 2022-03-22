@@ -3,7 +3,7 @@
 # as a standard part of the conda package. It is downloaded along with it though.
 # This script will do three things:
 
-# 1) modify the conda activate script, as found in 
+# 1) modify the conda (de/)activate scripts, as found in 
 # $CONDA_PREFIX/etc/conda/activate.d/env_vars.sh and 
 # $CONDA_PREFIX/etc/conda/deactivate.d/env_vars.sh
 # To set the HHLIB variable, and add the scripts part of the HHSuite module to the path
@@ -16,31 +16,23 @@
 # NOTE: These actions might interfere with other custom conda operations. Use at your own risk
 
 import os
-import download_databases
+import download_RRE_databases
+import shutil
 
 # Step 1
-
-activate_text = '''#!/bin/sh
-
-export HHLIB="$CONDA_PREFIX"
-export RRE_OLD_PATH="$PATH"
-export PATH="$PATH:$HHLIB/scripts"'''
-
-deactivate_text = '''#!/bin/sh
-
-unset HHLIB
-export PATH="$RRE_OLD_PATH"
-unset OLD_PATH'''
 
 conda_path = os.environ['CONDA_PREFIX']
 activate_folder = os.path.join(conda_path, 'etc', 'conda', 'activate.d')
 deactivate_folder = os.path.join(conda_path, 'etc', 'conda', 'deactivate.d')
-filename = 'RRE_envs.sh'
-for folder, text in zip((activate_folder, deactivate_folder), (activate_text, deactivate_text)):
+env_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'envs')
+
+activate_filename = 'RRE_activate.sh'
+deactivate_filename = 'RRE_deactivate.sh'
+
+for folder, filename in zip((activate_folder, deactivate_folder), (activate_filename, deactivate_filename)):
     if not os.path.isdir(folder):
         os.makedirs(folder)
-    with open(os.path.join(folder, filename), 'w') as handle:
-        handle.write(text)
+    shutil.copy(os.path.join(env_folder, filename), os.path.join(folder, filename))
 
 # Step 2
 hhpaths_file = os.path.join(conda_path, 'scripts', 'HHPaths.pm')
@@ -68,6 +60,6 @@ with open(hhpaths_file, 'w') as handle:
     handle.write(text_out)
 
 # Step 3
-download_databases.main()
+download_RRE_databases.main()
 
 print('Setup done. Please deactivate and reactivate the environment')
