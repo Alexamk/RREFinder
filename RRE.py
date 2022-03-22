@@ -1377,6 +1377,10 @@ def check_databases(settings):
 def check_installation(settings):
     commands = ['hmmsearch']
     if settings.mode == 'rrefinder' or settings.mode == 'both':
+        try:
+            hhlib = os.environ['HHLIB']
+        except KeyError:
+            raise ValueError('HHLIB environment variable not set.')
         commands.extend(['hhblits', 'hhsearch', 'addss.pl', 'psipred'])
     not_found = []
     for command in commands:
@@ -1387,11 +1391,6 @@ def check_installation(settings):
     if not_found:
         str_nf = ', '.join(not_found)
         raise ValueError(f'The following callables where not found: {str_nf}')
-    try:
-        hhlib = os.environ['HHLIB']
-    except KeyError:
-        raise ValueError('HHLIB environment variable not set.')
-            
 
 
 if __name__ == '__main__':
