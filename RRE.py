@@ -13,7 +13,7 @@ if PYTHON_VERSION == 2:
 elif PYTHON_VERSION == 3:
     import configparser
 
-from subprocess import call, Popen, PIPE
+from subprocess import run, Popen, PIPE
 
 from multiprocessing import Process, Queue
 
@@ -283,7 +283,7 @@ def a3m_hhblits(inf,outf,db,settings,threads=1,n=3):
     dumpfile = clean + '.hhr'
     commands = ['hhblits','-cpu',str(threads),'-d',db,'-i',inf,'-oa3m',outf,'-o',dumpfile,'-v','0','-n',str(n)]
     settings.logger.log(' '.join(commands),2)
-    call(commands)
+    _ = run(commands)
 
 def add_ss(group,settings,resubmit=False,remove=False):
     # Only if the alignment was also expanded
@@ -302,15 +302,9 @@ def add_ss(group,settings,resubmit=False,remove=False):
         if not os.path.isfile(newfile):
             cmds = ['addss.pl',infile,newfile,'-a3m']
             settings.logger.log(' '.join(cmds),2)
-            p = Popen(cmds,stdout=PIPE,stderr=PIPE)
-            stdout,stderr = p.communicate()
-            
-            if type(stdout) == bytes and not type(stdout) == str:
-                stdout = str(stdout, 'utf-8')
-            if type(stderr) == bytes and not type(stderr) == str:
-                stderr = str(stderr, 'utf-8')
-            settings.logger.log(stdout,2)
-            settings.logger.log(stderr,2)
+            p = run(cmds, capture_output=True, encoding='utf-8')
+            settings.logger.log(p.stdout, 2)
+            settings.logger.log(p.stderr, 2)
         if resubmit:
             group.RRE_expalign_file = newfile
             if remove:
@@ -341,7 +335,7 @@ def hhsearch_all(all_groups,settings):
 def hhsearch(settings,inf,outf,db,threads):
     commands = ['hhsearch','-cpu',str(threads),'-d',db,'-i',inf,'-o',outf, '-v','0']
     settings.logger.log(' '.join(commands),2)
-    call(commands)
+    _ = run(commands)
 
 def find_RRE_hits(results,targets,min_prob = 50.0,min_len = 0):
     sign_hits = {}
@@ -673,7 +667,7 @@ def hmmsearch(infile,database,outfile,domtblout,settings,evalue=False,cut=False,
         commands.extend(['-T',str(bitscore)])
     commands.extend([database,infile])
     settings.logger.log(' '.join(commands),1)
-    call(commands)
+    _ = run(commands)
     
 def write_results_summary(all_groups,outfile,settings,mode,resubmit=False,hmm=False,regulators=False):
     
@@ -1354,10 +1348,13 @@ def parse_arguments(configpath):
         settings.mode = 'rrefinder'
 
     return settings
-    
+
 def check_settings(settings):
     if settings.deepbgc and settings.antismash:
         raise ValueError('Incompatible settings: --deepbgc and --antismash')
+
+
+def check_databases(settings):
     required_files = {}
     if settings.mode == 'rrefam' or settings.mode == 'both':
         required_files['precision_hmm'] = [settings.rrefam_database]
@@ -1377,10 +1374,32 @@ def check_settings(settings):
                 raise ValueError(f'File {file} for category {category} not found. Please make sure all required databases are downloaded and their paths indicated in the config file.')
 
 
+def check_installation(settings):
+    commands = ['hmmsearch']
+    if settings.mode == 'rrefinder' or settings.mode == 'both':
+        commands.extend(['hhblits', 'hhsearch', 'addss.pl', 'psipred'])
+    not_found = []
+    for command in commands:
+        try:
+            run(command, capture_output=True)
+        except FileNotFoundError:
+            not_found.append(command)
+    if not_found:
+        str_nf = ', '.join(not_found)
+        raise ValueError(f'The following callables where not found: {str_nf}')
+    try:
+        hhlib = os.environ['HHLIB']
+    except KeyError:
+        raise ValueError('HHLIB environment variable not set.')
+            
+
+
 if __name__ == '__main__':
     configpath = os.path.join(os.path.join(os.path.dirname(__file__),'config.ini'))
     settings = parse_arguments(configpath)
     check_settings(settings)
+    check_databases(settings)
+    check_installation(settings)
     t0 = time.time()
     res,parsed_data_dict = main(settings)
     t1 = time.time()
