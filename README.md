@@ -1,16 +1,8 @@
 # RREFinder
 Bioinformatic application for the detection of RREs in protein sequences of interest
 
-## Download guide:
-1) Clone the repository
-
-For exploratory mode:
-
-Databases need to be downloaded independently from https://zenodo.org/record/3733240#.XoRkIUEzbCI. 
-Please download all the files, except the folder with the seed sequences, and place them into the data/database folder within the downloaded repository.
-This can also be done by running ''download_RRE_databases.py''
-
 ## Installation guide:
+Clone the repository. 
 
 Install the included conda environment with `conda env create -f RREfinder.yml`.
     
@@ -33,6 +25,8 @@ Exploratory mode relies on the secondary structure predictions of HHSuite. Altho
 Running the script `setup_RRE_exploratory.py` will create shell files in the `/etc/conda/activate.d` and `/etc/conda/deactivate.d` folders that set and unset/reset the HHLIB and PATH variables. It will find the `HHPaths.pm` file and update it. And it will download the databases from the zenodo repository.
 
 Note that the script is sort of trying to overcome the fact that the HHsuite scripts are not officially supported. It has not been tested in a wide variety of conda environments. Use at your own risk, and let me know if it can be improved.
+
+Databases are downloaded using the `download_RRE_databases.py`` script. The `setup_RRE_exploratory.py` script takes care of this. You can also download them manually from https://zenodo.org/record/3733240#.XoRkIUEzbCI. If doing manually, download all the files, except the folder with the seed sequences, and place them into the data/database folder within the downloaded repository.
 
 If you prefer to perform steps 1-4 yourself (or if you prefer a manual installation), you can follow the steps below.
 
