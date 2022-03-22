@@ -16,7 +16,7 @@ Install the included conda environment with `conda env create -f RREfinder.yml`.
     
 At this point you can already run RREFinder in precision mode. Use python RRE.py with -m precision or --mode precision to do so.
 
-For exploratory mode, four more steps are necessary to use all functionalities of the HHSuite. These are accomplished by running the `setup_RRE_exploratory.py` script in the activated environment for conda-style installations. 
+For exploratory mode, four more steps are necessary to use all functionalities of the HHSuite. These are accomplished by running the `setup_RRE_exploratory.py` script in the activated environment for installations using the conda script above. After running it, deactivate and reactivate the environment to make the changes have effect. 
 
 In detail:
 
