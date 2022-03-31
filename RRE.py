@@ -1360,7 +1360,7 @@ def check_databases(settings):
         required_files['precision_hmm'] = [settings.rrefam_database]
     if settings.mode == 'rrefinder' or settings.mode == 'both':
         # Check that exploratory mode is installed correctly and databases are present
-        required_database_files = list(f'{basefile}.{ext}' for basefile, ext in product(['a3m', 'cs219', 'fas', 'hhm'], ['ffindex', 'ffdata']))
+        required_database_files = list(f'{basefile}.{ext}' for basefile, ext in product(['a3m', 'cs219', 'hhm'], ['ffindex', 'ffdata']))
         if settings.rrefinder_primary_mode == 'hhpred':
             required_files['exploraty_hhpred_initial_database'] = [f'{settings.expand_database_path}_{ext}' for ext in required_database_files]
         elif settings.rrefinder_primary_mode == 'hmm':
