@@ -25,7 +25,7 @@ def main():
     with open(record_file) as handle:
         json_dict = json.load(handle)
 
-    required_files = set(f'RRE_v7_3_{base}.{ext}' for base, ext in product(['a3m', 'cs219', 'fas', 'hhm'], ['ffindex', 'ffdata']))
+    required_files = set(f'RRE_v7_3_{base}.{ext}' for base, ext in product(['a3m', 'cs219', 'hhm'], ['ffindex', 'ffdata']))
     database_files_already_present = os.listdir(database_folder)
     links_to_download = {}
     for available_file in json_dict['files']:
