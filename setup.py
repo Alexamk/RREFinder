@@ -10,7 +10,7 @@ def generate_package_data():
             for f in files:
                 data_files.append(os.path.join(path, f))
     data_files.append('config.ini')
-    package_data={'BiG-SCAPE': data_files}
+    package_data={'RREFinder': data_files}
     return package_data
 
 setup(
