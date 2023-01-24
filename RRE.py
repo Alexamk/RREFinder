@@ -3,16 +3,18 @@ import os
 import sys
 import argparse
 import time
+from itertools import product
 
 from Bio import SeqIO
 
+# For backwards compatibility
 PYTHON_VERSION = sys.version_info[0]
 if PYTHON_VERSION == 2:
     import ConfigParser as configparser
 elif PYTHON_VERSION == 3:
     import configparser
 
-from subprocess import call, Popen, PIPE
+from subprocess import run, Popen, PIPE
 
 from multiprocessing import Process, Queue
 
@@ -286,7 +288,7 @@ def a3m_hhblits(inf,outf,db,settings,threads=1,n=3):
     dumpfile = clean + '.hhr'
     commands = ['hhblits','-cpu',str(threads),'-d',db,'-i',inf,'-oa3m',outf,'-o',dumpfile,'-v','0','-n',str(n)]
     settings.logger.log(' '.join(commands),2)
-    call(commands)
+    _ = run(commands)
 
 def add_ss(group,settings,resubmit=False,remove=False):
     # Only if the alignment was also expanded
@@ -305,15 +307,9 @@ def add_ss(group,settings,resubmit=False,remove=False):
         if not os.path.isfile(newfile):
             cmds = ['addss.pl',infile,newfile,'-a3m']
             settings.logger.log(' '.join(cmds),2)
-            p = Popen(cmds,stdout=PIPE,stderr=PIPE)
-            stdout,stderr = p.communicate()
-            
-            if type(stdout) == bytes and not type(stdout) == str:
-                stdout = str(stdout, 'utf-8')
-            if type(stderr) == bytes and not type(stderr) == str:
-                stderr = str(stderr, 'utf-8')
-            settings.logger.log(stdout,2)
-            settings.logger.log(stderr,2)
+            p = run(cmds, capture_output=True, encoding='utf-8')
+            settings.logger.log(p.stdout, 2)
+            settings.logger.log(p.stderr, 2)
         if resubmit:
             group.RRE_expalign_file = newfile
             if remove:
@@ -344,7 +340,7 @@ def hhsearch_all(all_groups,settings):
 def hhsearch(settings,inf,outf,db,threads):
     commands = ['hhsearch','-cpu',str(threads),'-d',db,'-i',inf,'-o',outf, '-v','0']
     settings.logger.log(' '.join(commands),2)
-    call(commands)
+    _ = run(commands)
 
 def find_RRE_hits(results,targets,min_prob = 50.0,min_len = 0):
     sign_hits = {}
@@ -676,7 +672,7 @@ def hmmsearch(infile,database,outfile,domtblout,settings,evalue=False,cut=False,
         commands.extend(['-T',str(bitscore)])
     commands.extend([database,infile])
     settings.logger.log(' '.join(commands),1)
-    call(commands)
+    _ = run(commands)
     
 def write_results_summary(all_groups,outfile,settings,mode,resubmit=False,hmm=False,regulators=False):
     
@@ -1178,8 +1174,6 @@ def main(settings):
     # Set the logfile
     logger = Log(settings.logfile,settings.verbosity)
     settings.logger = logger
-    # Get the names of the targets that are considered RRE hits
-    RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
 
     # Now parse the files
     parsed_data_dict = parse_infiles(settings)
@@ -1190,6 +1184,8 @@ def main(settings):
     settings.logger.log('Continuing with %i queries' %(len(all_groups)),1)
     settings.logger.log('Skipped %i genes' %(len(skipped_genes)),2)
     if settings.mode == 'rrefinder' or settings.mode == 'both':
+        # Get the names of the targets that are considered RRE hits
+        RRE_targets = parse_fasta(settings.rre_fasta_path).keys()
         all_groups = rrefinder_main(settings,RRE_targets,all_groups)
     if settings.mode == 'rrefam' or settings.mode == 'both':
         rrefam_main(settings,all_groups)
@@ -1334,7 +1330,7 @@ def parse_arguments(configpath):
                              choices=[0,1,2],type=int,default=1)
     parser.add_argument('--regulator_filter',help='Filter out found regulatory/HTH pfams',default=False,action='store_true')
     parser.add_argument('--update_genbank',help='Make a new genbank file with the RRE hits',default=False,action='store_true')
-    
+
     rrefinder = parser.add_argument_group('Exploratory settings')
     rrefinder.add_argument('--rrefinder_min_prob',help='The minimum HHpred predicted probability for a hit to be considered significant (reads from config file if none is given)')
     rrefinder.add_argument('--rrefinder_primary_mode',help='Choose from either hhpred or hmm for the initial scan (default: hmm)',choices=['hmm','hhpred'],default='hmm')
@@ -1355,21 +1351,59 @@ def parse_arguments(configpath):
         settings.mode = 'rrefam'
     elif settings.mode == 'exploratory':
         settings.mode = 'rrefinder'
-        
 
     return settings
-    
-def check_incompatible_settings(settings):
-    if settings.rrefinder_primary_mode == 'hhpred' and not settings.expand_database_path:
-        raise ValueError('Using HHpred as initial mode for RREfinder requires an HHblits database. Please set the path in the config file')
+
+def check_settings(settings):
     if settings.deepbgc and settings.antismash:
         raise ValueError('Incompatible settings: --deepbgc and --antismash')
-       
-        
+
+
+def check_databases(settings):
+    required_files = {}
+    if settings.mode == 'rrefam' or settings.mode == 'both':
+        required_files['precision_hmm'] = [settings.rrefam_database]
+    if settings.mode == 'rrefinder' or settings.mode == 'both':
+        # Check that exploratory mode is installed correctly and databases are present
+        required_database_files = list(f'{basefile}.{ext}' for basefile, ext in product(['a3m', 'cs219', 'hhm'], ['ffindex', 'ffdata']))
+        if settings.rrefinder_primary_mode == 'hhpred':
+            required_files['exploraty_hhpred_initial_database'] = [f'{settings.expand_database_path}_{ext}' for ext in required_database_files]
+        elif settings.rrefinder_primary_mode == 'hmm':
+            required_files['exploratory_hmm'] = [settings.hmm_db]
+        required_files['exploratory_hhpred_resubmit_database'] = [f'{settings.resubmit_database}_{ext}' for ext in required_database_files]
+        required_files['HHsearch_fasta'] = [settings.rre_fasta_path]
+        required_files['HHsearch_database'] = [f'{settings.rre_database_path}_{ext}' for ext in required_database_files]
+    for category, files in required_files.items():
+        for file in files:
+            if not os.path.isfile(file):
+                raise ValueError(f'File {file} for category {category} not found. Please make sure all required databases are downloaded and their paths indicated in the config file.')
+
+
+def check_installation(settings):
+    commands = ['hmmsearch']
+    if settings.mode == 'rrefinder' or settings.mode == 'both':
+        try:
+            hhlib = os.environ['HHLIB']
+        except KeyError:
+            raise ValueError('HHLIB environment variable not set.')
+        commands.extend(['hhblits', 'hhsearch', 'addss.pl', 'psipred'])
+    not_found = []
+    for command in commands:
+        try:
+            run(command, capture_output=True)
+        except FileNotFoundError:
+            not_found.append(command)
+    if not_found:
+        str_nf = ', '.join(not_found)
+        raise ValueError(f'The following callables where not found: {str_nf}')
+
+
 if __name__ == '__main__':
     configpath = os.path.join(os.path.join(os.path.dirname(__file__),'config.ini'))
     settings = parse_arguments(configpath)
-    check_incompatible_settings(settings)
+    check_settings(settings)
+    check_databases(settings)
+    check_installation(settings)
     t0 = time.time()
     res,parsed_data_dict = main(settings)
     t1 = time.time()

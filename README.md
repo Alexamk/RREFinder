@@ -1,32 +1,48 @@
 # RREFinder
 Bioinformatic application for the detection of RREs in protein sequences of interest
 
-## Download guide:
-1) Clone the repository
-
-For exploratory mode:
-
-Databases need to be downloaded independently from https://zenodo.org/record/3733240#.XoRkIUEzbCI. 
-Please download all the files, except the folder with the seed sequences, and place them into the data/database folder within the downloaded repository.
-
 ## Installation guide:
+Clone the repository. 
 
-Install the included conda environment with "conda env create -f RREfinder.yml"
-Or make sure the following packages/programs are installed and in your path
+Install the included conda environment with `conda env create -f RREfinder.yml`.
+    
+At this point you can already run RREFinder in precision mode. Use python RRE.py with -m precision or --mode precision to do so.
+
+For exploratory mode, four more steps are necessary to use all functionalities of the HHSuite. These are accomplished by running the `setup_RRE_exploratory.py` script in the activated environment for installations using the conda script above. After running it, deactivate and reactivate the environment to make the changes have effect. 
+
+In detail:
+
+1) The environment variables HHLIB needs to be set and point towards the folder containing the HHSuite bin and scripts folder 
+
+2) The scripts folder needs to be added to path
+
+3) The HHPaths.pm file in the scripts folder needs to be updated to point to the right binaries
+
+4) The databases need to be downloaded
+
+Exploratory mode relies on the secondary structure predictions of HHSuite. Although the HHSuite is installed with Conda, the secondary structure prediction script is not, and not officially supported. It is required for exploratory mode however. It is downloaded along with the rest of the HHSuite package, and can be found in the environment scripts folder (Typically found under `$CONDA_PREFIX/scripts`).
+
+Running the script `setup_RRE_exploratory.py` will create shell files in the `/etc/conda/activate.d` and `/etc/conda/deactivate.d` folders that set and unset/reset the HHLIB and PATH variables. It will find the `HHPaths.pm` file and update it. And it will download the databases from the zenodo repository.
+
+Note that the script is sort of trying to overcome the fact that the HHsuite scripts are not officially supported. It has not been tested in a wide variety of conda environments. Use at your own risk, and let me know if it can be improved.
+
+Databases are downloaded using the `download_RRE_databases.py` script. The `setup_RRE_exploratory.py` script takes care of this. You can also download them manually from https://zenodo.org/record/3733240#.XoRkIUEzbCI. If doing manually, download all the files, except the folder with the seed sequences, and place them into the data/database folder within the downloaded repository.
+
+If you prefer to perform steps 1-4 yourself (or if you prefer a manual installation), you can follow the steps below.
+
+## Manual install
+
+1) Make sure the following packages/programs are installed and in your path
 
 - HMMER version >= 3.3
 - PSIPRED version >= 4.01
 - python package Biopython version >= 1.76
 
 RREFinder has not been tested for previous versions of these packages.
-    
-At this point you can already run RREFinder in precision mode. Use python RRE.py with -m precision or --mode precision to do so.
 
-For exploratory mode, please follow the instructions below.
+2) Install the HHsuite version >= 3.3  (https://github.com/soedinglab/hh-suite)
 
-1) Install the HHsuite version >= 3.3  (https://github.com/soedinglab/hh-suite)
-
-2) Make sure the following parameters are set (which is part of their recommended installation)
+3) Make sure the following parameters are set (which is part of their recommended installation)
     
 - $HHLIB is set to the folder containing the HHsuite tool
 - The binary files and the script files are in your path 
@@ -42,7 +58,7 @@ If you followed the instructions as on the GitHub of HHsuite, the skeleton used 
 
 Then reboot the terminal or rerun the file (source ~/.bashrc)
 
-3) Configure the HHsuite paths
+4) Configure the HHsuite paths
 Find the file HHPaths.pm in the HHsuite scripts folder 
 
         ##############################################################################################
