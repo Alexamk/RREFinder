@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import sys
 import argparse
@@ -14,6 +15,10 @@ elif PYTHON_VERSION == 3:
 from subprocess import call, Popen, PIPE
 
 from multiprocessing import Process, Queue
+
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+os.chdir(dname)
 
 def parse_genbank(infile):
     final_seq_dict = {}
