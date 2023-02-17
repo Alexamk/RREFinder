@@ -9,7 +9,8 @@ def generate_package_data():
         for path, dirs, files in os.walk(directory):
             for f in files:
                 data_files.append(os.path.join(path, f))
-    data_files.append('config.ini')
+    for other_file in ['config.ini','RRE.py','download_RRE_databases.py','setup_RRE_exploratory.py']:
+        data_files.append(other_file)
     package_data={'RREFinder': data_files}
     return package_data
 
